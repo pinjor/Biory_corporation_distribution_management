@@ -10,10 +10,12 @@ import {
   LayoutDashboard,
   LogOut,
   Package,
+  PackageOpen,
   PackagePlus,
   Pill,
   Receipt,
   Settings,
+  SlidersHorizontal,
   ShieldCheck,
   ShoppingCart,
   Stethoscope,
@@ -95,6 +97,18 @@ const NAV: { group: string; items: NavItem[] }[] = [
         icon: PackagePlus,
         roles: ["super_admin", "admin", "warehouse_admin"],
       },
+      {
+        to: "/inventory/opening",
+        label: "Opening stock",
+        icon: PackageOpen,
+        roles: ["super_admin", "admin", "warehouse_admin"],
+      },
+      {
+        to: "/inventory/adjust",
+        label: "Stock adjustment",
+        icon: SlidersHorizontal,
+        roles: ["super_admin", "admin", "warehouse_admin"],
+      },
       { to: "/products", label: "Products", icon: Pill },
     ],
   },
@@ -172,9 +186,15 @@ function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <Link to="/dashboard" className="flex items-center gap-2 px-2 py-1.5">
-          <img src="/icons/icon-192.png" alt="" className="size-8 shrink-0 rounded-lg bg-card object-contain p-0.5" />
+          <img
+            src="/icons/icon-192.png"
+            alt=""
+            className="size-8 shrink-0 rounded-lg bg-card object-contain p-0.5"
+          />
           <span className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="font-display text-base font-semibold text-sidebar-accent-foreground">BIORY</span>
+            <span className="font-display text-base font-semibold text-sidebar-accent-foreground">
+              BIORY
+            </span>
             <span className="text-[11px] text-sidebar-foreground/70">Corporation</span>
           </span>
         </Link>

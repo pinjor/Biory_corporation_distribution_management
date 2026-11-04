@@ -3,11 +3,26 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { PageHeader, Section, StatusBadge, KeyValue, PageLoader, Qty, Field } from "@/components/app/page";
+import {
+  PageHeader,
+  Section,
+  StatusBadge,
+  KeyValue,
+  PageLoader,
+  Qty,
+  Field,
+} from "@/components/app/page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useSession } from "@/lib/session";
 import { errorMessage, formatDateTime } from "@/lib/format";
 import { locationsQuery } from "@/lib/queries";
@@ -28,7 +43,9 @@ function RequisitionDetail() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("requisitions")
-        .select("*, profiles!requisitions_so_id_fkey(full_name, so_code), requisition_items(*, products(name, code, kind))")
+        .select(
+          "*, profiles!requisitions_so_id_fkey(full_name, so_code), requisition_items(*, products(name, code, kind))",
+        )
         .eq("id", id)
         .single();
       if (error) throw error;
@@ -39,7 +56,10 @@ function RequisitionDetail() {
     queryKey: ["central-available", central?.id],
     enabled: !!central && s.isWarehouse,
     queryFn: async () => {
-      const { data, error } = await supabase.from("v_stock").select("product_id, qty, days_to_expiry").eq("location_id", central!.id);
+      const { data, error } = await supabase
+        .from("v_stock")
+        .select("product_id, qty, days_to_expiry")
+        .eq("location_id", central!.id);
       if (error) throw error;
       return data;
     },
@@ -58,12 +78,19 @@ function RequisitionDetail() {
     },
   });
   const avail = new Map<string, number>();
-  for (const x of centralStock) if ((x.days_to_expiry ?? 0) > 0) avail.set(x.product_id!, (avail.get(x.product_id!) ?? 0) + (x.qty ?? 0));
+  for (const x of centralStock)
+    if ((x.days_to_expiry ?? 0) > 0)
+      avail.set(x.product_id!, (avail.get(x.product_id!) ?? 0) + (x.qty ?? 0));
 
   const [approved, setApproved] = useState<Record<string, number>>({});
   const [note, setNote] = useState("");
   useEffect(() => {
-    if (r) setApproved(Object.fromEntries(r.requisition_items.map((i) => [i.id, i.approved_qty ?? i.requested_qty])));
+    if (r)
+      setApproved(
+        Object.fromEntries(
+          r.requisition_items.map((i) => [i.id, i.approved_qty ?? i.requested_qty]),
+        ),
+      );
   }, [r]);
 
   const refresh = () => {
@@ -75,13 +102,19 @@ function RequisitionDetail() {
     mutationFn: async (reject: boolean) => {
       const { error } = await supabase.rpc("decide_requisition", {
         p_id: id,
-        p_items: Object.entries(approved).map(([item_id, approved_qty]) => ({ item_id, approved_qty })),
+        p_items: Object.entries(approved).map(([item_id, approved_qty]) => ({
+          item_id,
+          approved_qty,
+        })),
         p_reject: reject,
         p_note: note,
       });
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Decision saved"); refresh(); },
+    onSuccess: () => {
+      toast.success("Decision saved");
+      refresh();
+    },
     onError: (e) => toast.error(errorMessage(e)),
   });
   const issue = useMutation({
@@ -89,7 +122,10 @@ function RequisitionDetail() {
       const { error } = await supabase.rpc("issue_requisition", { p_id: id });
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Stock issued to SO (FEFO)"); refresh(); },
+    onSuccess: () => {
+      toast.success("Stock issued to SO (FEFO)");
+      refresh();
+    },
     onError: (e) => toast.error(errorMessage(e)),
   });
   const receive = useMutation({
@@ -97,7 +133,10 @@ function RequisitionDetail() {
       const { error } = await supabase.rpc("receive_requisition", { p_id: id });
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Receipt confirmed"); refresh(); },
+    onSuccess: () => {
+      toast.success("Receipt confirmed");
+      refresh();
+    },
     onError: (e) => toast.error(errorMessage(e)),
   });
   const cancel = useMutation({
@@ -105,27 +144,50 @@ function RequisitionDetail() {
       const { error } = await supabase.rpc("cancel_requisition", { p_id: id });
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Requisition cancelled"); refresh(); },
+    onSuccess: () => {
+      toast.success("Requisition cancelled");
+      refresh();
+    },
     onError: (e) => toast.error(errorMessage(e)),
   });
 
   if (isLoading || !r) return <PageLoader />;
   const canDecide = s.isWarehouse && r.status === "SUBMITTED";
   const canIssue = s.isWarehouse && ["APPROVED", "PARTIALLY_APPROVED"].includes(r.status);
-  const canReceive = r.so_id === s.userId && r.status === "ISSUED";
+  const canReceive = (r.so_id === s.userId || s.isAdmin) && r.status === "ISSUED";
   const canCancel = (r.so_id === s.userId || s.isAdmin) && r.status === "SUBMITTED";
 
   return (
     <div>
       <PageHeader
-        eyebrow={<Link to="/requisitions" className="hover:underline">Requisitions</Link>}
+        eyebrow={
+          <Link to="/requisitions" className="hover:underline">
+            Requisitions
+          </Link>
+        }
         title={<span className="num">{r.req_no}</span>}
         actions={
           <>
             <StatusBadge status={r.status} />
-            {canCancel && <Button variant="outline" onClick={() => cancel.mutate()} disabled={cancel.isPending}>Cancel</Button>}
-            {canIssue && <Button onClick={() => issue.mutate()} disabled={issue.isPending}>{issue.isPending ? "Issuing…" : "Issue stock (FEFO)"}</Button>}
-            {canReceive && <Button variant="success" onClick={() => receive.mutate()} disabled={receive.isPending}>Confirm received</Button>}
+            {canCancel && (
+              <Button variant="outline" onClick={() => cancel.mutate()} disabled={cancel.isPending}>
+                Cancel
+              </Button>
+            )}
+            {canIssue && (
+              <Button onClick={() => issue.mutate()} disabled={issue.isPending}>
+                {issue.isPending ? "Issuing…" : "Issue stock (FEFO)"}
+              </Button>
+            )}
+            {canReceive && (
+              <Button
+                variant="success"
+                onClick={() => receive.mutate()}
+                disabled={receive.isPending}
+              >
+                {r.so_id === s.userId ? "Confirm received" : "Confirm received for SO"}
+              </Button>
+            )}
           </>
         }
       />
@@ -146,10 +208,18 @@ function RequisitionDetail() {
                 <TableRow key={i.id}>
                   <TableCell>
                     <div className="font-medium">{i.products?.name}</div>
-                    <div className="num text-xs text-muted-foreground">{i.products?.code} · {i.products?.kind}</div>
+                    <div className="num text-xs text-muted-foreground">
+                      {i.products?.code} · {i.products?.kind}
+                    </div>
                   </TableCell>
-                  <TableCell className="text-right"><Qty value={i.requested_qty} /></TableCell>
-                  {canDecide && <TableCell className="text-right text-muted-foreground"><Qty value={avail.get(i.product_id) ?? 0} /></TableCell>}
+                  <TableCell className="text-right">
+                    <Qty value={i.requested_qty} />
+                  </TableCell>
+                  {canDecide && (
+                    <TableCell className="text-right text-muted-foreground">
+                      <Qty value={avail.get(i.product_id) ?? 0} />
+                    </TableCell>
+                  )}
                   <TableCell className="text-right">
                     {canDecide ? (
                       <Input
@@ -158,13 +228,23 @@ function RequisitionDetail() {
                         max={i.requested_qty}
                         className="num ml-auto w-24 text-right"
                         value={approved[i.id] ?? 0}
-                        onChange={(e) => setApproved({ ...approved, [i.id]: Math.max(0, Math.min(i.requested_qty, Math.floor(Number(e.target.value) || 0))) })}
+                        onChange={(e) =>
+                          setApproved({
+                            ...approved,
+                            [i.id]: Math.max(
+                              0,
+                              Math.min(i.requested_qty, Math.floor(Number(e.target.value) || 0)),
+                            ),
+                          })
+                        }
                       />
                     ) : (
                       <Qty value={i.approved_qty ?? "—"} />
                     )}
                   </TableCell>
-                  <TableCell className="text-right"><Qty value={i.issued_qty} /></TableCell>
+                  <TableCell className="text-right">
+                    <Qty value={i.issued_qty} />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -190,8 +270,19 @@ function RequisitionDetail() {
                 <Textarea value={note} onChange={(e) => setNote(e.target.value)} />
               </Field>
               <div className="mt-4 flex gap-2">
-                <Button className="flex-1" onClick={() => decide.mutate(false)} disabled={decide.isPending}>Approve quantities</Button>
-                <Button variant="outline" className="flex-1" onClick={() => decide.mutate(true)} disabled={decide.isPending || !note.trim()}>
+                <Button
+                  className="flex-1"
+                  onClick={() => decide.mutate(false)}
+                  disabled={decide.isPending}
+                >
+                  Approve quantities
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => decide.mutate(true)}
+                  disabled={decide.isPending || !note.trim()}
+                >
                   Reject
                 </Button>
               </div>
@@ -216,7 +307,9 @@ function RequisitionDetail() {
                   <TableCell>{m.products?.name}</TableCell>
                   <TableCell className="num text-xs">{m.batches?.batch_no}</TableCell>
                   <TableCell className="text-xs">{m.batches?.expiry_date}</TableCell>
-                  <TableCell className="text-right"><Qty value={m.qty} /></TableCell>
+                  <TableCell className="text-right">
+                    <Qty value={m.qty} />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

@@ -12,7 +12,7 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "inline-flex h-11 max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-border/70 bg-muted/70 p-1 text-muted-foreground shadow-[inset_0_1px_2px_color-mix(in_oklab,var(--foreground)_6%,transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+      "inline-flex h-12 max-w-full items-center gap-1 overflow-x-auto rounded-2xl border bg-card p-1.5 text-muted-foreground shadow-card [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
       className,
     )}
     {...props}
@@ -27,7 +27,7 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex h-full shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 text-sm font-medium ring-offset-background cursor-pointer transition-all duration-200 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed data-[state=active]:bg-card data-[state=active]:font-semibold data-[state=active]:text-primary data-[state=active]:shadow-[0_1px_2px_color-mix(in_oklab,var(--foreground)_10%,transparent),0_4px_12px_-6px_color-mix(in_oklab,var(--primary)_45%,transparent)] [&_svg]:size-4",
+      "group/tab relative inline-flex h-full shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-medium ring-offset-background cursor-pointer select-none transition-all duration-200 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_6px_16px_-6px_color-mix(in_oklab,var(--primary)_70%,transparent)] data-[state=active]:hover:bg-primary [&_svg]:size-4 [&_svg]:opacity-70 data-[state=active]:[&_svg]:opacity-100",
       className,
     )}
     {...props}
