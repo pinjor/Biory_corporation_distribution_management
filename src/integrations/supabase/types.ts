@@ -1123,6 +1123,7 @@ export type Database = {
       requisitions: {
         Row: {
           created_at: string
+          created_by: string | null
           decided_at: string | null
           decided_by: string | null
           decision_note: string | null
@@ -1137,6 +1138,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
           decided_at?: string | null
           decided_by?: string | null
           decision_note?: string | null
@@ -1151,6 +1153,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          created_by?: string | null
           decided_at?: string | null
           decided_by?: string | null
           decision_note?: string | null
@@ -1767,6 +1770,10 @@ export type Database = {
       }
       submit_requisition: {
         Args: { p_items: Json; p_remarks: string }
+        Returns: string
+      }
+      submit_requisition_for: {
+        Args: { p_approve?: boolean; p_items: Json; p_remarks: string; p_so: string }
         Returns: string
       }
       today_bd: { Args: never; Returns: string }

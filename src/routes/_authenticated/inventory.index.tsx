@@ -1,18 +1,48 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { ArrowLeftRight, History, PackagePlus, SlidersHorizontal } from "lucide-react";
+import {
+  ArrowLeftRight,
+  History,
+  PackageOpen,
+  PackagePlus,
+  SlidersHorizontal,
+  UserRound,
+  Warehouse,
+} from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { PageHeader, Section, Money, Qty, ExpiryBadge, EmptyState, Field, StatCard } from "@/components/app/page";
+import {
+  PageHeader,
+  Section,
+  Money,
+  Qty,
+  ExpiryBadge,
+  EmptyState,
+  Field,
+  StatCard,
+} from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { locationsQuery, myAvailableStockQuery, productsQuery, settingsQuery } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { errorMessage, formatBDT, formatDate } from "@/lib/format";
@@ -66,14 +96,23 @@ function InventoryPage() {
         if (expiry === "expired" && d > 0) return false;
         if (expiry === "near" && (d <= 0 || d > near)) return false;
         if (expiry === "ok" && d <= near) return false;
-        if (q && !`${r.product_code} ${r.product_name} ${r.batch_no}`.toLowerCase().includes(q.toLowerCase())) return false;
+        if (
+          q &&
+          !`${r.product_code} ${r.product_name} ${r.batch_no}`
+            .toLowerCase()
+            .includes(q.toLowerCase())
+        )
+          return false;
         return true;
       }),
     [rows, kind, expiry, q, near],
   );
 
   const totals = useMemo(() => {
-    let value = 0, units = 0, nearN = 0, expN = 0;
+    let value = 0,
+      units = 0,
+      nearN = 0,
+      expN = 0;
     for (const r of rows) {
       units += r.qty ?? 0;
       value += Number(r.value_trp ?? 0);
@@ -94,11 +133,22 @@ function InventoryPage() {
         actions={
           <>
             <Button asChild variant="outline">
-              <Link to="/inventory/ledger"><History /> Ledger</Link>
+              <Link to="/inventory/ledger">
+                <History /> Ledger
+              </Link>
             </Button>
             {s.isWarehouse && (
+              <Button asChild variant="outline">
+                <Link to="/inventory/adjust">
+                  <SlidersHorizontal /> Adjust
+                </Link>
+              </Button>
+            )}
+            {s.isWarehouse && (
               <Button asChild>
-                <Link to="/inventory/receive"><PackagePlus /> Receive stock</Link>
+                <Link to="/inventory/receive">
+                  <PackagePlus /> Receive stock
+                </Link>
               </Button>
             )}
           </>
@@ -108,15 +158,25 @@ function InventoryPage() {
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <Tabs value={tab} onValueChange={(v) => setTab(v as "central" | "so")}>
           <TabsList>
-            <TabsTrigger value="central">Central warehouse</TabsTrigger>
-            <TabsTrigger value="so">{s.isStaff ? "SO stock" : "My stock"}</TabsTrigger>
+            <TabsTrigger value="central">
+              <Warehouse /> Central warehouse
+            </TabsTrigger>
+            <TabsTrigger value="so">
+              <UserRound /> {s.isStaff ? "SO stock" : "My stock"}
+            </TabsTrigger>
           </TabsList>
         </Tabs>
         {tab === "so" && s.isStaff && (
-          <NativeSelect className="w-60" value={soLoc || soLocs[0]?.id || ""} onChange={(e) => setSoLoc(e.target.value)}>
+          <NativeSelect
+            className="w-60"
+            value={soLoc || soLocs[0]?.id || ""}
+            onChange={(e) => setSoLoc(e.target.value)}
+          >
             {soLocs.length === 0 && <option value="">No Sales Officers yet</option>}
             {soLocs.map((l) => (
-              <option key={l.id} value={l.id}>{l.name}</option>
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
             ))}
           </NativeSelect>
         )}
@@ -125,8 +185,18 @@ function InventoryPage() {
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Units on hand" value={<Qty value={totals.units} />} />
         <StatCard label="Value at TRP" value={formatBDT(totals.value)} />
-        <StatCard label="Near expiry batches" value={totals.nearN} tone={totals.nearN ? "warning" : "default"} hint={`Within ${near} days`} />
-        <StatCard label="Expired batches" value={totals.expN} tone={totals.expN ? "destructive" : "default"} hint="Blocked from use" />
+        <StatCard
+          label="Near expiry batches"
+          value={totals.nearN}
+          tone={totals.nearN ? "warning" : "default"}
+          hint={`Within ${near} days`}
+        />
+        <StatCard
+          label="Expired batches"
+          value={totals.expN}
+          tone={totals.expN ? "destructive" : "default"}
+          hint="Blocked from use"
+        />
       </div>
 
       {showSoSummary && <MyAvailability />}
@@ -136,13 +206,26 @@ function InventoryPage() {
         bodyClassName="p-0"
         actions={
           <div className="flex flex-wrap gap-2">
-            <Input placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} className="h-8 w-40" />
-            <NativeSelect value={kind} onChange={(e) => setKind(e.target.value)} className="h-8 w-32">
+            <Input
+              placeholder="Search…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="h-8 w-40"
+            />
+            <NativeSelect
+              value={kind}
+              onChange={(e) => setKind(e.target.value)}
+              className="h-8 w-32"
+            >
               <option value="">All kinds</option>
               <option value="saleable">Saleable</option>
               <option value="promotional">Promotional</option>
             </NativeSelect>
-            <NativeSelect value={expiry} onChange={(e) => setExpiry(e.target.value)} className="h-8 w-32">
+            <NativeSelect
+              value={expiry}
+              onChange={(e) => setExpiry(e.target.value)}
+              className="h-8 w-32"
+            >
               <option value="">Any expiry</option>
               <option value="near">Near expiry</option>
               <option value="expired">Expired</option>
@@ -153,8 +236,28 @@ function InventoryPage() {
               variant="outline"
               onClick={() =>
                 downloadCsv("stock.csv", [
-                  ["location", "product_code", "product", "kind", "batch", "expiry", "qty", "base_trp", "value_trp"],
-                  ...filtered.map((r) => [r.location_name, r.product_code, r.product_name, r.product_kind, r.batch_no, r.expiry_date, r.qty, r.base_trp, r.value_trp]),
+                  [
+                    "location",
+                    "product_code",
+                    "product",
+                    "kind",
+                    "batch",
+                    "expiry",
+                    "qty",
+                    "base_trp",
+                    "value_trp",
+                  ],
+                  ...filtered.map((r) => [
+                    r.location_name,
+                    r.product_code,
+                    r.product_name,
+                    r.product_kind,
+                    r.batch_no,
+                    r.expiry_date,
+                    r.qty,
+                    r.base_trp,
+                    r.value_trp,
+                  ]),
                 ])
               }
             >
@@ -169,10 +272,16 @@ function InventoryPage() {
           <div className="p-5">
             <EmptyState
               title="No stock here"
-              description={tab === "so" && !s.isStaff ? "Request stock from the central warehouse to start selling." : "Nothing matches these filters."}
+              description={
+                tab === "so" && !s.isStaff
+                  ? "Request stock from the central warehouse to start selling."
+                  : "Nothing matches these filters."
+              }
               action={
                 tab === "so" && s.isSO ? (
-                  <Button asChild size="sm"><Link to="/requisitions/new">Request stock</Link></Button>
+                  <Button asChild size="sm">
+                    <Link to="/requisitions/new">Request stock</Link>
+                  </Button>
                 ) : undefined
               }
             />
@@ -206,15 +315,31 @@ function InventoryPage() {
                       <ExpiryBadge days={r.days_to_expiry} nearDays={near} />
                     </div>
                   </TableCell>
-                  <TableCell className="text-right font-semibold"><Qty value={r.qty} /></TableCell>
-                  <TableCell className="text-right"><Money value={r.base_trp} /></TableCell>
-                  <TableCell className="text-right"><Money value={r.value_trp} /></TableCell>
+                  <TableCell className="text-right font-semibold">
+                    <Qty value={r.qty} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Money value={r.base_trp} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Money value={r.value_trp} />
+                  </TableCell>
                   {s.isWarehouse && (
                     <TableCell className="whitespace-nowrap text-right">
-                      <Button variant="ghost" size="icon" onClick={() => setTransfer(r)} aria-label="Transfer">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setTransfer(r)}
+                        aria-label="Transfer"
+                      >
                         <ArrowLeftRight />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => setAdjust(r)} aria-label="Adjust">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setAdjust(r)}
+                        aria-label="Adjust"
+                      >
                         <SlidersHorizontal />
                       </Button>
                     </TableCell>
@@ -251,9 +376,15 @@ function MyAvailability() {
           {data.map((r) => (
             <TableRow key={r.product_id}>
               <TableCell className="font-medium">{byId.get(r.product_id)?.name ?? "—"}</TableCell>
-              <TableCell className="text-right"><Qty value={r.on_hand} /></TableCell>
-              <TableCell className="text-right text-muted-foreground"><Qty value={r.reserved} /></TableCell>
-              <TableCell className="text-right font-semibold"><Qty value={r.available} /></TableCell>
+              <TableCell className="text-right">
+                <Qty value={r.on_hand} />
+              </TableCell>
+              <TableCell className="text-right text-muted-foreground">
+                <Qty value={r.reserved} />
+              </TableCell>
+              <TableCell className="text-right font-semibold">
+                <Qty value={r.available} />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -298,21 +429,37 @@ function AdjustDialog({ row, onClose }: { row: StockRow; onClose: () => void }) 
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Adjust {row.product_name} · {row.batch_no}</DialogTitle>
+          <DialogTitle>
+            Adjust {row.product_name} · {row.batch_no}
+          </DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground">On hand at {row.location_name}: <Qty value={row.qty} /></p>
+        <p className="text-sm text-muted-foreground">
+          On hand at {row.location_name}: <Qty value={row.qty} />
+        </p>
         <div className="grid gap-4">
           <Field label="Adjustment type">
             <NativeSelect value={type} onChange={(e) => setType(e.target.value)}>
-              {ADJ_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              {ADJ_TYPES.map(([v, l]) => (
+                <option key={v} value={v}>
+                  {l}
+                </option>
+              ))}
             </NativeSelect>
           </Field>
-          <Field label="Quantity"><Input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
-          <Field label="Reason (required)"><Textarea value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+          <Field label="Quantity">
+            <Input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} />
+          </Field>
+          <Field label="Reason (required)">
+            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} />
+          </Field>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => m.mutate()} disabled={m.isPending || !qty || !reason.trim()}>Post adjustment</Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={() => m.mutate()} disabled={m.isPending || !qty || !reason.trim()}>
+            Post adjustment
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -322,7 +469,9 @@ function AdjustDialog({ row, onClose }: { row: StockRow; onClose: () => void }) 
 function TransferDialog({ row, onClose }: { row: StockRow; onClose: () => void }) {
   const qc = useQueryClient();
   const { data: locations = [] } = useQuery(locationsQuery);
-  const targets = locations.filter((l) => l.id !== row.location_id && !(row.location_kind === "central" && l.kind === "central"));
+  const targets = locations.filter(
+    (l) => l.id !== row.location_id && !(row.location_kind === "central" && l.kind === "central"),
+  );
   const [to, setTo] = useState(targets[0]?.id ?? "");
   const [qty, setQty] = useState("");
   const [reason, setReason] = useState("");
@@ -348,21 +497,46 @@ function TransferDialog({ row, onClose }: { row: StockRow; onClose: () => void }
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Transfer {row.product_name} · {row.batch_no}</DialogTitle>
+          <DialogTitle>
+            Transfer {row.product_name} · {row.batch_no}
+          </DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground">From {row.location_name} (on hand <Qty value={row.qty} />)</p>
+        <p className="text-sm text-muted-foreground">
+          From {row.location_name} (on hand <Qty value={row.qty} />)
+        </p>
         <div className="grid gap-4">
           <Field label="To location">
             <NativeSelect value={to} onChange={(e) => setTo(e.target.value)}>
-              {targets.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+              {targets.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
             </NativeSelect>
           </Field>
-          <Field label="Quantity"><Input type="number" min={1} max={row.qty ?? undefined} value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
-          <Field label="Reason (required)"><Textarea value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+          <Field label="Quantity">
+            <Input
+              type="number"
+              min={1}
+              max={row.qty ?? undefined}
+              value={qty}
+              onChange={(e) => setQty(e.target.value)}
+            />
+          </Field>
+          <Field label="Reason (required)">
+            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} />
+          </Field>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => m.mutate()} disabled={m.isPending || !qty || !reason.trim() || !to}>Transfer</Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => m.mutate()}
+            disabled={m.isPending || !qty || !reason.trim() || !to}
+          >
+            Transfer
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
