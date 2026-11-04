@@ -2,13 +2,26 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app/app-shell";
 import type { AppRole, SessionInfo } from "@/lib/session";
-import { isNetworkAuthError, readSessionCache, saveSessionCache } from "@/lib/offline/session-cache";
+import {
+  clearOfflineCaches,
+  isNetworkAuthError,
+  readSessionCache,
+  saveSessionCache,
+} from "@/lib/offline/session-cache";
+import { sessionShouldEnd } from "@/lib/auth/remember-me";
 
 const GET_USER_TIMEOUT_MS = 8000;
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async ({ location }) => {
+    // "Remember me" was off and the browser has been closed since: end the session on this device.
+    if (sessionShouldEnd()) {
+      clearOfflineCaches();
+      await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+      throw redirect({ to: "/auth", search: { redirect: location.href } as never });
+    }
+
     const cached = readSessionCache();
     // No connection: open with the identity last seen on this device (server calls still need a valid sign-in).
     if (cached && typeof navigator !== "undefined" && navigator.onLine === false) {
@@ -20,7 +33,9 @@ export const Route = createFileRoute("/_authenticated")({
     try {
       result = await Promise.race([
         supabase.auth.getUser(),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Sign-in check timed out")), GET_USER_TIMEOUT_MS)),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Sign-in check timed out")), GET_USER_TIMEOUT_MS),
+        ),
       ]);
       networkError = !result.data.user && isNetworkAuthError(result.error);
     } catch {
