@@ -11,7 +11,7 @@ import { formatDateTime, humanize } from "@/lib/format";
 import { downloadCsv } from "@/lib/csv";
 
 export const Route = createFileRoute("/_authenticated/inventory/ledger")({
-  head: () => ({ meta: [{ title: "Stock ledger — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Stock ledger — BIORY Corporation" }] }),
   component: LedgerPage,
 });
 

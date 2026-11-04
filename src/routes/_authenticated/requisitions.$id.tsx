@@ -13,7 +13,7 @@ import { errorMessage, formatDateTime } from "@/lib/format";
 import { locationsQuery } from "@/lib/queries";
 
 export const Route = createFileRoute("/_authenticated/requisitions/$id")({
-  head: () => ({ meta: [{ title: "Requisition — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Requisition — BIORY Corporation" }] }),
   component: RequisitionDetail,
 });
 

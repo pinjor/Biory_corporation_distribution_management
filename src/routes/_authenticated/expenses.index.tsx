@@ -13,7 +13,7 @@ import { downloadCsv } from "@/lib/csv";
 import { categoryLabel, EXPENSE_CATEGORIES } from "@/lib/expenses";
 
 export const Route = createFileRoute("/_authenticated/expenses/")({
-  head: () => ({ meta: [{ title: "Expenses — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Expenses — BIORY Corporation" }] }),
   component: ExpensesPage,
 });
 

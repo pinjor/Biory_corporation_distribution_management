@@ -15,7 +15,7 @@ import { errorMessage, todayBD } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/visits/new")({
   validateSearch: (s: Record<string, unknown>): { doctor?: string } => (typeof s["doctor"] === "string" ? { doctor: s["doctor"] } : {}),
-  head: () => ({ meta: [{ title: "Log doctor visit — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Log doctor visit — BIORY Corporation" }] }),
   component: NewVisit,
 });
 

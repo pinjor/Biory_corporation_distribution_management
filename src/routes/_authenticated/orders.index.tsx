@@ -13,9 +13,10 @@ import { useSession } from "@/lib/session";
 import { addDays, formatDate, todayBD } from "@/lib/format";
 import { downloadCsv } from "@/lib/csv";
 import { QueuedOrdersPanel } from "@/components/app/sync-status";
+import { useOffline } from "@/components/app/offline-provider";
 
 export const Route = createFileRoute("/_authenticated/orders/")({
-  head: () => ({ meta: [{ title: "Orders — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Orders — BIORY Corporation" }] }),
   component: OrdersPage,
 });
 
@@ -44,7 +45,8 @@ function OrdersPage() {
   const { data: sos = [] } = useQuery({ ...salesOfficersQuery, enabled: s.isStaff });
   const { data: territories = [] } = useQuery(territoriesQuery);
 
-  const { data = [], isLoading, fetchStatus } = useQuery({
+  const { online } = useOffline();
+  const { data = [], isLoading, isSuccess, fetchStatus } = useQuery({
     queryKey: ["orders", view, so, from, to],
     queryFn: async () => {
       let qq = supabase
@@ -142,7 +144,7 @@ function OrdersPage() {
           </div>
         }
       >
-        {isLoading && fetchStatus === "paused" ? (
+        {!isSuccess && (fetchStatus === "paused" || !online) ? (
           <div className="p-6 text-sm text-muted-foreground">You're offline. Order history appears here once you're connected again.</div>
         ) : isLoading ? (
           <div className="p-6 text-sm text-muted-foreground">Loading…</div>

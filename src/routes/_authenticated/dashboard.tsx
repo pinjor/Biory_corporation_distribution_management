@@ -23,7 +23,7 @@ import { formatBDT, formatBDTCompact, formatInt, rangeFor, todayBD, type RangeKe
 import { salesOfficersQuery } from "@/lib/queries";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  head: () => ({ meta: [{ title: "Dashboard — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Dashboard — BIORY Corporation" }] }),
   component: Dashboard,
 });
 

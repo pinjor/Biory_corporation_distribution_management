@@ -16,7 +16,7 @@ import { errorMessage, formatBDT, formatDateTime, humanize, todayBD } from "@/li
 import { downloadCsv } from "@/lib/csv";
 
 export const Route = createFileRoute("/_authenticated/wallet")({
-  head: () => ({ meta: [{ title: "Wallet — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Wallet — BIORY Corporation" }] }),
   component: WalletPage,
 });
 

@@ -21,7 +21,7 @@ import { downloadCsv } from "@/lib/csv";
 type StockRow = Database["public"]["Views"]["v_stock"]["Row"];
 
 export const Route = createFileRoute("/_authenticated/inventory/")({
-  head: () => ({ meta: [{ title: "Stock — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Stock — BIORY Corporation" }] }),
   component: InventoryPage,
 });
 

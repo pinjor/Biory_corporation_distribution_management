@@ -12,7 +12,7 @@ import { formatDate, formatDateTime } from "@/lib/format";
 import { downloadCsv } from "@/lib/csv";
 
 export const Route = createFileRoute("/_authenticated/deposits/")({
-  head: () => ({ meta: [{ title: "Deposits — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Deposits — BIORY Corporation" }] }),
   component: DepositsPage,
 });
 

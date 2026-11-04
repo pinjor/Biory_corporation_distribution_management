@@ -2,17 +2,18 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Boxes, HandCoins, PackageCheck, Stethoscope, Truck, Warehouse } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import heroImg from "@/assets/field-hero.jpg";
+import logo from "@/assets/biory-logo.png.asset.json";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "PharmaField — Pharma field sales, stock & collections" },
+      { title: "BIORY Corporation — Pharma field sales, stock & collections" },
       {
         name: "description",
         content:
           "One platform for central warehouse, SO inventory, chemist orders, partial deliveries, collections, SO wallets and doctor visits.",
       },
-      { property: "og:title", content: "PharmaField — Pharma field sales, stock & collections" },
+      { property: "og:title", content: "BIORY Corporation — Pharma field sales, stock & collections" },
       {
         property: "og:description",
         content: "Batch-and-expiry stock ledger, FEFO issue, partial delivery, partial payment and approved SO deposits.",
@@ -38,12 +39,9 @@ function Landing() {
     <div className="min-h-screen bg-background">
       <header className="bg-hero text-sidebar-foreground">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
-          <div className="flex items-center gap-2">
-            <span className="grid size-8 place-items-center rounded-lg bg-highlight font-display text-sm font-bold text-highlight-foreground">
-              Pf
-            </span>
-            <span className="font-display text-lg font-semibold text-sidebar-accent-foreground">PharmaField</span>
-          </div>
+          <span className="inline-flex rounded-lg bg-card px-3 py-1.5 shadow-card">
+            <img src={logo.url} alt="BIORY Corporation" className="h-11 w-auto" />
+          </span>
           <Button asChild variant="highlight" size="sm">
             <Link to="/auth">Sign in</Link>
           </Button>
@@ -114,7 +112,7 @@ function Landing() {
           ))}
         </ol>
       </main>
-      <footer className="border-t py-8 text-center text-xs text-muted-foreground">PharmaField · Asia/Dhaka</footer>
+      <footer className="border-t py-8 text-center text-xs text-muted-foreground">BIORY Corporation · Asia/Dhaka</footer>
     </div>
   );
 }

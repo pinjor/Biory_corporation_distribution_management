@@ -14,7 +14,7 @@ import { addDays, formatDate, todayBD } from "@/lib/format";
 import { downloadCsv } from "@/lib/csv";
 
 export const Route = createFileRoute("/_authenticated/visits/")({
-  head: () => ({ meta: [{ title: "Doctor visits — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Doctor visits — BIORY Corporation" }] }),
   component: VisitsPage,
 });
 

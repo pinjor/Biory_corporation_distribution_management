@@ -12,7 +12,7 @@ import { useSession } from "@/lib/session";
 import { errorMessage, formatDate, formatDateTime } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/deposits/$id")({
-  head: () => ({ meta: [{ title: "Deposit — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Deposit — BIORY Corporation" }] }),
   component: DepositDetail,
 });
 

@@ -10,10 +10,10 @@ import { errorMessage } from "@/lib/format";
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
     meta: [
-      { title: "Set a new password — PharmaField" },
-      { name: "description", content: "Choose a new password for your PharmaField account." },
-      { property: "og:title", content: "Set a new password — PharmaField" },
-      { property: "og:description", content: "Choose a new password for your PharmaField account." },
+      { title: "Set a new password — BIORY Corporation" },
+      { name: "description", content: "Choose a new password for your BIORY Corporation account." },
+      { property: "og:title", content: "Set a new password — BIORY Corporation" },
+      { property: "og:description", content: "Choose a new password for your BIORY Corporation account." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],

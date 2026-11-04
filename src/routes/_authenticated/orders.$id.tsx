@@ -19,7 +19,7 @@ import { round2 } from "@/lib/pricing";
 import { addDays, errorMessage, formatDate, formatDateTime, formatPct, todayBD } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/orders/$id")({
-  head: () => ({ meta: [{ title: "Order — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Order — BIORY Corporation" }] }),
   component: OrderDetail,
 });
 

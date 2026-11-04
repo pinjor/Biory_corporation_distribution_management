@@ -8,14 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/app/page";
 import { errorMessage } from "@/lib/format";
+import logo from "@/assets/biory-logo.png.asset.json";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in — PharmaField" },
-      { name: "description", content: "Sign in to PharmaField to manage stock, orders, deliveries and collections." },
-      { property: "og:title", content: "Sign in — PharmaField" },
-      { property: "og:description", content: "Access your PharmaField workspace." },
+      { title: "Sign in — BIORY Corporation" },
+      { name: "description", content: "Sign in to BIORY Corporation to manage stock, orders, deliveries and collections." },
+      { property: "og:title", content: "Sign in — BIORY Corporation" },
+      { property: "og:description", content: "Access your BIORY Corporation workspace." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -81,12 +82,9 @@ function AuthPage() {
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       <div className="bg-hero hidden flex-col justify-between p-10 text-sidebar-foreground lg:flex">
-        <div className="flex items-center gap-2">
-          <span className="grid size-8 place-items-center rounded-lg bg-highlight font-display text-sm font-bold text-highlight-foreground">
-            Pf
+        <span className="inline-flex rounded-lg bg-card px-3 py-1.5 shadow-card">
+            <img src={logo.url} alt="BIORY Corporation" className="h-11 w-auto" />
           </span>
-          <span className="font-display text-lg font-semibold text-sidebar-accent-foreground">PharmaField</span>
-        </div>
         <blockquote className="max-w-md">
           <p className="font-display text-3xl leading-tight text-sidebar-accent-foreground">
             Stock decreases on delivery. Money moves on approval. History never changes.
@@ -96,6 +94,7 @@ function AuthPage() {
       </div>
       <div className="flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
+          <img src={logo.url} alt="BIORY Corporation" className="mb-6 h-10 w-auto lg:hidden" />
           <h1 className="text-2xl font-semibold">
             {mode === "signin" ? "Welcome back" : mode === "signup" ? "Create your account" : "Reset password"}
           </h1>
@@ -104,7 +103,7 @@ function AuthPage() {
               ? "New accounts get access once a Super Admin assigns your role."
               : mode === "forgot"
                 ? "We'll email you a link to set a new password."
-                : "Sign in to your PharmaField workspace."}
+                : "Sign in to your BIORY Corporation workspace."}
           </p>
 
           {sent ? (

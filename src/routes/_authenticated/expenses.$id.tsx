@@ -13,7 +13,7 @@ import { errorMessage, formatDate, formatDateTime } from "@/lib/format";
 import { categoryLabel } from "@/lib/expenses";
 
 export const Route = createFileRoute("/_authenticated/expenses/$id")({
-  head: () => ({ meta: [{ title: "Expense — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Expense — BIORY Corporation" }] }),
   component: ExpenseDetail,
 });
 
@@ -56,6 +56,7 @@ function ExpenseDetail() {
       if (error) throw error;
     },
     onSuccess: () => {
+      window.__lovableEvents?.track?.("project.expense_reviewed", { decision: "approved", category: e?.category ?? "OTHER" });
       toast.success("Expense approved");
       refresh();
     },
@@ -173,6 +174,7 @@ function ExpenseDetail() {
           run={async (reason) => {
             const { error } = await supabase.rpc("review_expense", { p_id: id, p_approve: false, p_note: reason });
             if (error) throw error;
+            window.__lovableEvents?.track?.("project.expense_reviewed", { decision: "rejected", category: e.category });
             refresh();
           }}
         />

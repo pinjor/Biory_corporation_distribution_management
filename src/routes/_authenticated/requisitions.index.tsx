@@ -11,7 +11,7 @@ import { useSession } from "@/lib/session";
 import { formatDateTime } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/requisitions/")({
-  head: () => ({ meta: [{ title: "Requisitions — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Requisitions — BIORY Corporation" }] }),
   component: RequisitionsPage,
 });
 

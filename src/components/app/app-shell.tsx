@@ -172,11 +172,10 @@ function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <Link to="/dashboard" className="flex items-center gap-2 px-2 py-1.5">
-          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-sidebar-primary font-display text-sm font-bold text-sidebar-primary-foreground">
-            Pf
-          </span>
-          <span className="font-display text-base font-semibold text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden">
-            PharmaField
+          <img src="/icons/icon-192.png" alt="" className="size-8 shrink-0 rounded-lg bg-card object-contain p-0.5" />
+          <span className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
+            <span className="font-display text-base font-semibold text-sidebar-accent-foreground">BIORY</span>
+            <span className="text-[11px] text-sidebar-foreground/70">Corporation</span>
           </span>
         </Link>
       </SidebarHeader>
@@ -365,7 +364,7 @@ function AwaitingAccess() {
         <p className="mt-2 text-sm text-muted-foreground">
           You're signed in as <span className="font-medium text-foreground">{session.email}</span>.
           A Super Admin needs to assign your role (for example Sales Officer or Warehouse Admin)
-          before you can use PharmaField.
+          before you can use BIORY Corporation.
         </p>
         <div className="mt-6 flex justify-center gap-2">
           <Button variant="outline" onClick={() => window.location.reload()}>

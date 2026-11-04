@@ -21,7 +21,7 @@ import { downloadCsv } from "@/lib/csv";
 type Product = Database["public"]["Tables"]["products"]["Row"];
 
 export const Route = createFileRoute("/_authenticated/products")({
-  head: () => ({ meta: [{ title: "Products — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Products — BIORY Corporation" }] }),
   component: ProductsPage,
 });
 

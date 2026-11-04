@@ -20,7 +20,7 @@ import { ORDER_DRAFT_KEY as DRAFT_KEY, type OrderDraft as Draft } from "@/lib/of
 export const Route = createFileRoute("/_authenticated/orders/new")({
   validateSearch: (s: Record<string, unknown>): { chemist?: string } =>
     typeof s["chemist"] === "string" ? { chemist: s["chemist"] } : {},
-  head: () => ({ meta: [{ title: "New order — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "New order — BIORY Corporation" }] }),
   component: NewOrder,
 });
 
@@ -100,6 +100,7 @@ function NewOrder() {
       netEstimate: totals.net,
     });
     localStorage.removeItem(DRAFT_KEY);
+    window.__lovableEvents?.track?.("project.offline_order_queued", { reason: why, line_count: lines.length });
     toast.success(why === "offline" ? "Saved on this device — it will sync automatically when you're back online" : "Connection dropped — order saved on this device and will sync automatically");
     navigate({ to: "/orders" });
   };
@@ -159,7 +160,7 @@ function NewOrder() {
         <div className="flex flex-col gap-6">
           <Section title="Chemist">
             {chemists.length === 0 && !offline.online && chemistsPending ? (
-              <EmptyState title="Your chemist list isn't on this device yet" description="Connect to the internet once so PharmaField can download your chemists and products." />
+              <EmptyState title="Your chemist list isn't on this device yet" description="Connect to the internet once so the app can download your chemists and products." />
             ) : chemists.length === 0 ? (
               <EmptyState
                 title="No chemists assigned to you"

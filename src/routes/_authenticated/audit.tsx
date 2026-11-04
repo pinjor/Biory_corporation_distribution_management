@@ -11,7 +11,7 @@ import { formatDateTime, humanize } from "@/lib/format";
 import type { Json } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/_authenticated/audit")({
-  head: () => ({ meta: [{ title: "Audit log — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Audit log — BIORY Corporation" }] }),
   component: AuditPage,
 });
 

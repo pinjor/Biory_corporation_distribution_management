@@ -17,7 +17,7 @@ import { errorMessage } from "@/lib/format";
 type Settings = Database["public"]["Tables"]["app_settings"]["Row"];
 
 export const Route = createFileRoute("/_authenticated/settings")({
-  head: () => ({ meta: [{ title: "Pricing & policy — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Pricing & policy — BIORY Corporation" }] }),
   component: SettingsPage,
 });
 

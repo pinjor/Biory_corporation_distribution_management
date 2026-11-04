@@ -14,7 +14,7 @@ import { ALL_ROLES, ROLE_LABELS, useSession, type AppRole } from "@/lib/session"
 import { errorMessage, formatDate } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/users")({
-  head: () => ({ meta: [{ title: "Users & roles — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Users & roles — BIORY Corporation" }] }),
   component: UsersPage,
 });
 

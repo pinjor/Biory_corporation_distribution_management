@@ -138,6 +138,13 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
           return { data: r.data, error: r.error, status: r.status };
         });
         setLastSyncError(report.interrupted ? "Connection is unstable — will keep trying." : null);
+        for (const r of report.synced) {
+          const waitMinutes = Math.max(0, Math.round((Date.now() - new Date(r.order.createdAt).getTime()) / 60_000));
+          window.__lovableEvents?.track?.("project.offline_order_synced", { attempts: r.order.attempts + 1, wait_minutes: waitMinutes });
+        }
+        for (const r of report.rejected) {
+          window.__lovableEvents?.track?.("project.offline_order_rejected", { attempts: r.order.attempts + 1 });
+        }
         if (report.synced.length) {
           toast.success(report.synced.length === 1 ? `Order for ${report.synced[0]!.order.chemistName} synced` : `${report.synced.length} queued orders synced`);
           void qc.invalidateQueries({ queryKey: ["orders"] });

@@ -15,7 +15,7 @@ import { errorMessage, todayBD } from "@/lib/format";
 import { compressReceipt, EXPENSE_CATEGORIES, RECEIPT_MAX_FILES, RECEIPT_TYPES, receiptProblem } from "@/lib/expenses";
 
 export const Route = createFileRoute("/_authenticated/expenses/new")({
-  head: () => ({ meta: [{ title: "New expense — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "New expense — BIORY Corporation" }] }),
   component: NewExpense,
 });
 
@@ -65,6 +65,7 @@ function NewExpense() {
       return data as string;
     },
     onSuccess: (id) => {
+      window.__lovableEvents?.track?.("project.expense_submitted", { category: f.category, receipt_count: files.length });
       toast.success("Expense submitted for Finance review");
       qc.invalidateQueries({ queryKey: ["expenses"] });
       navigate({ to: "/expenses/$id", params: { id } });

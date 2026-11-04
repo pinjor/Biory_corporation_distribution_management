@@ -8,7 +8,7 @@ import { settingsQuery } from "@/lib/queries";
 import { formatDate, formatDateTime } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/deliveries/$id")({
-  head: () => ({ meta: [{ title: "Delivery challan — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Delivery challan — BIORY Corporation" }] }),
   component: Challan,
 });
 

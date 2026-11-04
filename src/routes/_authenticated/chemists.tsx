@@ -14,7 +14,7 @@ import { useSession } from "@/lib/session";
 import { downloadCsv } from "@/lib/csv";
 
 export const Route = createFileRoute("/_authenticated/chemists")({
-  head: () => ({ meta: [{ title: "Chemists — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Chemists — BIORY Corporation" }] }),
   component: ChemistsPage,
 });
 

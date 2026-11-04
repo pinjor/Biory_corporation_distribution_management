@@ -16,7 +16,7 @@ import { errorMessage, formatDate, todayBD } from "@/lib/format";
 import { downloadCsv, OPENING_STOCK_HEADERS, parseCsv, validateOpeningStock, type OpeningRow, type RowIssue } from "@/lib/csv";
 
 export const Route = createFileRoute("/_authenticated/inventory/receive")({
-  head: () => ({ meta: [{ title: "Receive stock — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Receive stock — BIORY Corporation" }] }),
   component: ReceivePage,
 });
 

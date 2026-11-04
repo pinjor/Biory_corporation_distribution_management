@@ -1,6 +1,6 @@
 {
-  "name": "PharmaField",
-  "short_name": "PharmaField",
+  "name": "BIORY Corporation",
+  "short_name": "BIORY",
   "description": "Field sales, stock, orders and collections for pharma Sales Officers.",
   "start_url": "/dashboard",
   "scope": "/",

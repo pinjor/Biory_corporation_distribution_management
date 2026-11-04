@@ -13,7 +13,7 @@ import { addDays, daysBetween, formatBDT, formatDate, formatInt, rangeFor, today
 import { downloadCsv } from "@/lib/csv";
 
 export const Route = createFileRoute("/_authenticated/reports")({
-  head: () => ({ meta: [{ title: "Reports — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "Reports — BIORY Corporation" }] }),
   component: ReportsPage,
 });
 

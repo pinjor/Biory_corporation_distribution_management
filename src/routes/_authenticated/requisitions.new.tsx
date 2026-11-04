@@ -13,7 +13,7 @@ import { useSession } from "@/lib/session";
 import { errorMessage } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/requisitions/new")({
-  head: () => ({ meta: [{ title: "New requisition — PharmaField" }] }),
+  head: () => ({ meta: [{ title: "New requisition — BIORY Corporation" }] }),
   component: NewRequisition,
 });
 
