@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { productsQuery } from "@/lib/queries";
+import { opt, productsQuery } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { errorMessage, formatDate, todayBD } from "@/lib/format";
 import { downloadCsv, OPENING_STOCK_HEADERS, parseCsv, validateOpeningStock, type OpeningRow, type RowIssue } from "@/lib/csv";
@@ -51,12 +51,12 @@ function ManualReceipt() {
       const { error } = await supabase.rpc("receive_stock", {
         p_product: f.product,
         p_batch_no: f.batch,
-        p_mfg: f.mfg || undefined,
+        p_mfg: opt(f.mfg),
         p_expiry: f.expiry,
         p_qty: Number(f.qty),
         p_type: f.type,
-        p_reference: f.reference || undefined,
-        p_remarks: f.remarks || undefined,
+        p_reference: opt(f.reference),
+        p_remarks: opt(f.remarks),
       });
       if (error) throw error;
     },

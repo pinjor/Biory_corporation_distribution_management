@@ -140,7 +140,7 @@ function ProductDialog({ product, onClose }: { product: Partial<Product>; onClos
   const qc = useQueryClient();
   const { data: settings } = useQuery(settingsQuery);
   const [f, setF] = useState<Partial<Product>>({
-    trade_discount_pct: product.id ? product.trade_discount_pct : (settings?.default_trade_discount_pct ?? 15),
+    trade_discount_pct: product.id ? (product.trade_discount_pct ?? 15) : (settings?.default_trade_discount_pct ?? 15),
     reorder_level: 0,
     mrp: 0,
     ...product,

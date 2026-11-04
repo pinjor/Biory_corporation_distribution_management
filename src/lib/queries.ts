@@ -1,57 +1,91 @@
 import { queryOptions } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-async function unwrap<T>(p: PromiseLike<{ data: T | null; error: { message: string } | null }>): Promise<T> {
-  const { data, error } = await p;
-  if (error) throw new Error(error.message);
-  return data as T;
-}
-
 export const settingsQuery = queryOptions({
   queryKey: ["settings"],
-  queryFn: () => unwrap(supabase.from("app_settings").select("*").eq("id", 1).single()),
+  queryFn: async () => {
+    const { data, error } = await supabase.from("app_settings").select("*").eq("id", 1).single();
+    if (error) throw error;
+    return data;
+  },
   staleTime: 60_000,
 });
 
 export const productsQuery = queryOptions({
   queryKey: ["products"],
-  queryFn: () => unwrap(supabase.from("products").select("*").order("name")),
+  queryFn: async () => {
+    const { data, error } = await supabase.from("products").select("*").order("name");
+    if (error) throw error;
+    return data;
+  },
   staleTime: 30_000,
 });
 
 export const territoriesQuery = queryOptions({
   queryKey: ["territories"],
-  queryFn: () => unwrap(supabase.from("territories").select("*").order("name")),
+  queryFn: async () => {
+    const { data, error } = await supabase.from("territories").select("*").order("name");
+    if (error) throw error;
+    return data;
+  },
   staleTime: 60_000,
 });
 
 export const locationsQuery = queryOptions({
   queryKey: ["locations"],
-  queryFn: () => unwrap(supabase.from("locations").select("*").order("kind").order("name")),
+  queryFn: async () => {
+    const { data, error } = await supabase.from("locations").select("*").order("kind").order("name");
+    if (error) throw error;
+    return data;
+  },
   staleTime: 30_000,
 });
 
-/** All Sales Officers (profiles holding the sales_officer role). Visible to admins. */
+/** All Sales Officers (profiles holding the sales_officer role). */
 export const salesOfficersQuery = queryOptions({
   queryKey: ["sales-officers"],
   queryFn: async () => {
-    const roles = await unwrap(supabase.from("user_roles").select("user_id").eq("role", "sales_officer"));
+    const { data: roles, error } = await supabase.from("user_roles").select("user_id").eq("role", "sales_officer");
+    if (error) throw error;
     const ids = roles.map((r) => r.user_id);
     if (ids.length === 0) return [];
-    return unwrap(supabase.from("profiles").select("*").in("id", ids).order("full_name"));
+    const { data, error: e2 } = await supabase.from("profiles").select("*").in("id", ids).order("full_name");
+    if (e2) throw e2;
+    return data;
   },
   staleTime: 30_000,
 });
 
 export const profilesQuery = queryOptions({
   queryKey: ["profiles"],
-  queryFn: () => unwrap(supabase.from("profiles").select("*").order("full_name")),
+  queryFn: async () => {
+    const { data, error } = await supabase.from("profiles").select("*").order("full_name");
+    if (error) throw error;
+    return data;
+  },
   staleTime: 30_000,
 });
 
 export const myAvailableStockQuery = queryOptions({
   queryKey: ["my-available-stock"],
-  queryFn: () => unwrap(supabase.rpc("my_available_stock")),
+  queryFn: async () => {
+    const { data, error } = await supabase.rpc("my_available_stock");
+    if (error) throw error;
+    return data;
+  },
 });
 
-export { unwrap };
+/** Drop undefined/empty-string values so optional RPC args are simply omitted. */
+export function clean<T extends Record<string, unknown>>(o: T): T {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(o)) if (v !== undefined && v !== "") out[k] = v;
+  return out as T;
+}
+
+/**
+ * Generated RPC types mark every argument as a non-null string/number, but the
+ * database functions accept SQL NULL for optional values. These helpers send NULL.
+ */
+export const opt = (v: string | null | undefined) => (v === undefined || v === null || v.trim() === "" ? null : v) as string;
+export const optNum = (v: number | string | null | undefined) =>
+  (v === undefined || v === null || v === "" || !Number.isFinite(Number(v)) ? null : Number(v)) as number;

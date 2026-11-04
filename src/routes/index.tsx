@@ -76,7 +76,7 @@ function Landing() {
               width={1280}
               height={1280}
             />
-            <div className="surface-card absolute -bottom-6 left-4 right-4 p-4 sm:left-8 sm:right-auto sm:w-72">
+            <div className="surface-card absolute -bottom-6 left-4 right-4 p-4 text-card-foreground sm:left-8 sm:right-auto sm:w-72">
               <div className="text-xs uppercase tracking-wide text-muted-foreground">ORD-2026-000182 · MA Pharmacy</div>
               <div className="mt-2 flex items-baseline justify-between">
                 <span className="text-sm text-muted-foreground">Delivered</span>

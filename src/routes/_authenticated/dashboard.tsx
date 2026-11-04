@@ -66,7 +66,7 @@ function useSummary(from: string, to: string, so: string | null) {
   return useQuery({
     queryKey: ["dashboard", from, to, so],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("dashboard_summary", { p_from: from, p_to: to, p_so: so ?? undefined });
+      const { data, error } = await supabase.rpc("dashboard_summary", so ? { p_from: from, p_to: to, p_so: so } : { p_from: from, p_to: to });
       if (error) throw error;
       return data as unknown as Summary;
     },

@@ -79,7 +79,7 @@ export const OPENING_STOCK_HEADERS = ["product_code", "batch_no", "mfg_date", "e
 export interface OpeningRow {
   line: number;
   product_code: string;
-  product_name?: string;
+  product_name?: string | undefined;
   batch_no: string;
   mfg_date: string;
   expiry_date: string;
@@ -107,16 +107,19 @@ export function validateOpeningStock(
   const issues: RowIssue[] = [];
   const rows: OpeningRow[] = [];
   if (table.length === 0) return { rows, issues: [{ line: 0, message: "The file is empty" }] };
-  const header = table[0].map((h) => h.trim().toLowerCase());
-  const idx = Object.fromEntries(OPENING_STOCK_HEADERS.map((h) => [h, header.indexOf(h)]));
+  const header = (table[0] ?? []).map((h) => h.trim().toLowerCase());
+  const idx: Record<string, number> = Object.fromEntries(OPENING_STOCK_HEADERS.map((h) => [h, header.indexOf(h)]));
   for (const required of ["product_code", "batch_no", "expiry_date", "qty"]) {
-    if (idx[required] < 0) issues.push({ line: 1, message: `Missing column "${required}"` });
+    if ((idx[required] ?? -1) < 0) issues.push({ line: 1, message: `Missing column "${required}"` });
   }
   if (issues.length) return { rows, issues };
   const seen = new Set<string>();
   table.slice(1).forEach((r, k) => {
     const line = k + 2;
-    const get = (h: string) => (idx[h] >= 0 ? (r[idx[h]] ?? "").trim() : "");
+    const get = (h: string) => {
+      const i = idx[h] ?? -1;
+      return i >= 0 ? (r[i] ?? "").trim() : "";
+    };
     const code = get("product_code");
     const batch = get("batch_no");
     const mfg = get("mfg_date");

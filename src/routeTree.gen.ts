@@ -13,15 +13,29 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
+import { Route as AuthenticatedChemistsRouteImport } from './routes/_authenticated/chemists'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedDoctorsRouteImport } from './routes/_authenticated/doctors'
 import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
+import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/users'
+import { Route as AuthenticatedWalletRouteImport } from './routes/_authenticated/wallet'
+import { Route as AuthenticatedDeliveriesIdRouteImport } from './routes/_authenticated/deliveries.$id'
+import { Route as AuthenticatedDepositsIndexRouteImport } from './routes/_authenticated/deposits.index'
+import { Route as AuthenticatedDepositsIdRouteImport } from './routes/_authenticated/deposits.$id'
 import { Route as AuthenticatedInventoryIndexRouteImport } from './routes/_authenticated/inventory.index'
 import { Route as AuthenticatedInventoryLedgerRouteImport } from './routes/_authenticated/inventory.ledger'
 import { Route as AuthenticatedInventoryReceiveRouteImport } from './routes/_authenticated/inventory.receive'
+import { Route as AuthenticatedOrdersIndexRouteImport } from './routes/_authenticated/orders.index'
+import { Route as AuthenticatedOrdersIdRouteImport } from './routes/_authenticated/orders.$id'
+import { Route as AuthenticatedOrdersNewRouteImport } from './routes/_authenticated/orders.new'
 import { Route as AuthenticatedRequisitionsIndexRouteImport } from './routes/_authenticated/requisitions.index'
 import { Route as AuthenticatedRequisitionsIdRouteImport } from './routes/_authenticated/requisitions.$id'
 import { Route as AuthenticatedRequisitionsNewRouteImport } from './routes/_authenticated/requisitions.new'
+import { Route as AuthenticatedVisitsIndexRouteImport } from './routes/_authenticated/visits.index'
+import { Route as AuthenticatedVisitsNewRouteImport } from './routes/_authenticated/visits.new'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -42,9 +56,24 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
   path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAuditRoute = AuthenticatedAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedChemistsRoute = AuthenticatedChemistsRouteImport.update({
+  id: '/chemists',
+  path: '/chemists',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedDoctorsRoute = AuthenticatedDoctorsRouteImport.update({
+  id: '/doctors',
+  path: '/doctors',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedProductsRoute = AuthenticatedProductsRouteImport.update({
@@ -52,9 +81,41 @@ const AuthenticatedProductsRoute = AuthenticatedProductsRouteImport.update({
   path: '/products',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedUsersRoute = AuthenticatedUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedWalletRoute = AuthenticatedWalletRouteImport.update({
+  id: '/wallet',
+  path: '/wallet',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedDeliveriesIdRoute =
+  AuthenticatedDeliveriesIdRouteImport.update({
+    id: '/deliveries/$id',
+    path: '/deliveries/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDepositsIndexRoute =
+  AuthenticatedDepositsIndexRouteImport.update({
+    id: '/deposits/',
+    path: '/deposits/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDepositsIdRoute = AuthenticatedDepositsIdRouteImport.update({
+  id: '/deposits/$id',
+  path: '/deposits/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedInventoryIndexRoute =
@@ -75,6 +136,22 @@ const AuthenticatedInventoryReceiveRoute =
     path: '/inventory/receive',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedOrdersIndexRoute =
+  AuthenticatedOrdersIndexRouteImport.update({
+    id: '/orders/',
+    path: '/orders/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedOrdersIdRoute = AuthenticatedOrdersIdRouteImport.update({
+  id: '/orders/$id',
+  path: '/orders/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedOrdersNewRoute = AuthenticatedOrdersNewRouteImport.update({
+  id: '/orders/new',
+  path: '/orders/new',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedRequisitionsIndexRoute =
   AuthenticatedRequisitionsIndexRouteImport.update({
     id: '/requisitions/',
@@ -93,34 +170,73 @@ const AuthenticatedRequisitionsNewRoute =
     path: '/requisitions/new',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedVisitsIndexRoute =
+  AuthenticatedVisitsIndexRouteImport.update({
+    id: '/visits/',
+    path: '/visits/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedVisitsNewRoute = AuthenticatedVisitsNewRouteImport.update({
+  id: '/visits/new',
+  path: '/visits/new',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/audit': typeof AuthenticatedAuditRoute
+  '/chemists': typeof AuthenticatedChemistsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/doctors': typeof AuthenticatedDoctorsRoute
   '/products': typeof AuthenticatedProductsRoute
+  '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/users': typeof AuthenticatedUsersRoute
+  '/wallet': typeof AuthenticatedWalletRoute
+  '/deliveries/$id': typeof AuthenticatedDeliveriesIdRoute
+  '/deposits/$id': typeof AuthenticatedDepositsIdRoute
   '/inventory/ledger': typeof AuthenticatedInventoryLedgerRoute
   '/inventory/receive': typeof AuthenticatedInventoryReceiveRoute
+  '/orders/$id': typeof AuthenticatedOrdersIdRoute
+  '/orders/new': typeof AuthenticatedOrdersNewRoute
   '/requisitions/$id': typeof AuthenticatedRequisitionsIdRoute
   '/requisitions/new': typeof AuthenticatedRequisitionsNewRoute
+  '/visits/new': typeof AuthenticatedVisitsNewRoute
+  '/deposits/': typeof AuthenticatedDepositsIndexRoute
   '/inventory/': typeof AuthenticatedInventoryIndexRoute
+  '/orders/': typeof AuthenticatedOrdersIndexRoute
   '/requisitions/': typeof AuthenticatedRequisitionsIndexRoute
+  '/visits/': typeof AuthenticatedVisitsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/audit': typeof AuthenticatedAuditRoute
+  '/chemists': typeof AuthenticatedChemistsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/doctors': typeof AuthenticatedDoctorsRoute
   '/products': typeof AuthenticatedProductsRoute
+  '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/users': typeof AuthenticatedUsersRoute
+  '/wallet': typeof AuthenticatedWalletRoute
+  '/deliveries/$id': typeof AuthenticatedDeliveriesIdRoute
+  '/deposits/$id': typeof AuthenticatedDepositsIdRoute
   '/inventory/ledger': typeof AuthenticatedInventoryLedgerRoute
   '/inventory/receive': typeof AuthenticatedInventoryReceiveRoute
+  '/orders/$id': typeof AuthenticatedOrdersIdRoute
+  '/orders/new': typeof AuthenticatedOrdersNewRoute
   '/requisitions/$id': typeof AuthenticatedRequisitionsIdRoute
   '/requisitions/new': typeof AuthenticatedRequisitionsNewRoute
+  '/visits/new': typeof AuthenticatedVisitsNewRoute
+  '/deposits': typeof AuthenticatedDepositsIndexRoute
   '/inventory': typeof AuthenticatedInventoryIndexRoute
+  '/orders': typeof AuthenticatedOrdersIndexRoute
   '/requisitions': typeof AuthenticatedRequisitionsIndexRoute
+  '/visits': typeof AuthenticatedVisitsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -128,15 +244,29 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/_authenticated/audit': typeof AuthenticatedAuditRoute
+  '/_authenticated/chemists': typeof AuthenticatedChemistsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/doctors': typeof AuthenticatedDoctorsRoute
   '/_authenticated/products': typeof AuthenticatedProductsRoute
+  '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/users': typeof AuthenticatedUsersRoute
+  '/_authenticated/wallet': typeof AuthenticatedWalletRoute
+  '/_authenticated/deliveries/$id': typeof AuthenticatedDeliveriesIdRoute
+  '/_authenticated/deposits/$id': typeof AuthenticatedDepositsIdRoute
   '/_authenticated/inventory/ledger': typeof AuthenticatedInventoryLedgerRoute
   '/_authenticated/inventory/receive': typeof AuthenticatedInventoryReceiveRoute
+  '/_authenticated/orders/$id': typeof AuthenticatedOrdersIdRoute
+  '/_authenticated/orders/new': typeof AuthenticatedOrdersNewRoute
   '/_authenticated/requisitions/$id': typeof AuthenticatedRequisitionsIdRoute
   '/_authenticated/requisitions/new': typeof AuthenticatedRequisitionsNewRoute
+  '/_authenticated/visits/new': typeof AuthenticatedVisitsNewRoute
+  '/_authenticated/deposits/': typeof AuthenticatedDepositsIndexRoute
   '/_authenticated/inventory/': typeof AuthenticatedInventoryIndexRoute
+  '/_authenticated/orders/': typeof AuthenticatedOrdersIndexRoute
   '/_authenticated/requisitions/': typeof AuthenticatedRequisitionsIndexRoute
+  '/_authenticated/visits/': typeof AuthenticatedVisitsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -144,44 +274,86 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/reset-password'
+    | '/audit'
+    | '/chemists'
     | '/dashboard'
+    | '/doctors'
     | '/products'
+    | '/reports'
     | '/settings'
+    | '/users'
+    | '/wallet'
+    | '/deliveries/$id'
+    | '/deposits/$id'
     | '/inventory/ledger'
     | '/inventory/receive'
+    | '/orders/$id'
+    | '/orders/new'
     | '/requisitions/$id'
     | '/requisitions/new'
+    | '/visits/new'
+    | '/deposits/'
     | '/inventory/'
+    | '/orders/'
     | '/requisitions/'
+    | '/visits/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
     | '/reset-password'
+    | '/audit'
+    | '/chemists'
     | '/dashboard'
+    | '/doctors'
     | '/products'
+    | '/reports'
     | '/settings'
+    | '/users'
+    | '/wallet'
+    | '/deliveries/$id'
+    | '/deposits/$id'
     | '/inventory/ledger'
     | '/inventory/receive'
+    | '/orders/$id'
+    | '/orders/new'
     | '/requisitions/$id'
     | '/requisitions/new'
+    | '/visits/new'
+    | '/deposits'
     | '/inventory'
+    | '/orders'
     | '/requisitions'
+    | '/visits'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
     | '/reset-password'
+    | '/_authenticated/audit'
+    | '/_authenticated/chemists'
     | '/_authenticated/dashboard'
+    | '/_authenticated/doctors'
     | '/_authenticated/products'
+    | '/_authenticated/reports'
     | '/_authenticated/settings'
+    | '/_authenticated/users'
+    | '/_authenticated/wallet'
+    | '/_authenticated/deliveries/$id'
+    | '/_authenticated/deposits/$id'
     | '/_authenticated/inventory/ledger'
     | '/_authenticated/inventory/receive'
+    | '/_authenticated/orders/$id'
+    | '/_authenticated/orders/new'
     | '/_authenticated/requisitions/$id'
     | '/_authenticated/requisitions/new'
+    | '/_authenticated/visits/new'
+    | '/_authenticated/deposits/'
     | '/_authenticated/inventory/'
+    | '/_authenticated/orders/'
     | '/_authenticated/requisitions/'
+    | '/_authenticated/visits/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -221,11 +393,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/audit': {
+      id: '/_authenticated/audit'
+      path: '/audit'
+      fullPath: '/audit'
+      preLoaderRoute: typeof AuthenticatedAuditRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/chemists': {
+      id: '/_authenticated/chemists'
+      path: '/chemists'
+      fullPath: '/chemists'
+      preLoaderRoute: typeof AuthenticatedChemistsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/doctors': {
+      id: '/_authenticated/doctors'
+      path: '/doctors'
+      fullPath: '/doctors'
+      preLoaderRoute: typeof AuthenticatedDoctorsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/products': {
@@ -235,11 +428,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProductsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/reports': {
+      id: '/_authenticated/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof AuthenticatedReportsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/users': {
+      id: '/_authenticated/users'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof AuthenticatedUsersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/wallet': {
+      id: '/_authenticated/wallet'
+      path: '/wallet'
+      fullPath: '/wallet'
+      preLoaderRoute: typeof AuthenticatedWalletRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/deliveries/$id': {
+      id: '/_authenticated/deliveries/$id'
+      path: '/deliveries/$id'
+      fullPath: '/deliveries/$id'
+      preLoaderRoute: typeof AuthenticatedDeliveriesIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/deposits/': {
+      id: '/_authenticated/deposits/'
+      path: '/deposits'
+      fullPath: '/deposits/'
+      preLoaderRoute: typeof AuthenticatedDepositsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/deposits/$id': {
+      id: '/_authenticated/deposits/$id'
+      path: '/deposits/$id'
+      fullPath: '/deposits/$id'
+      preLoaderRoute: typeof AuthenticatedDepositsIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/inventory/': {
@@ -263,6 +498,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInventoryReceiveRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/orders/': {
+      id: '/_authenticated/orders/'
+      path: '/orders'
+      fullPath: '/orders/'
+      preLoaderRoute: typeof AuthenticatedOrdersIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/orders/$id': {
+      id: '/_authenticated/orders/$id'
+      path: '/orders/$id'
+      fullPath: '/orders/$id'
+      preLoaderRoute: typeof AuthenticatedOrdersIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/orders/new': {
+      id: '/_authenticated/orders/new'
+      path: '/orders/new'
+      fullPath: '/orders/new'
+      preLoaderRoute: typeof AuthenticatedOrdersNewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/requisitions/': {
       id: '/_authenticated/requisitions/'
       path: '/requisitions'
@@ -284,31 +540,73 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRequisitionsNewRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/visits/': {
+      id: '/_authenticated/visits/'
+      path: '/visits'
+      fullPath: '/visits/'
+      preLoaderRoute: typeof AuthenticatedVisitsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/visits/new': {
+      id: '/_authenticated/visits/new'
+      path: '/visits/new'
+      fullPath: '/visits/new'
+      preLoaderRoute: typeof AuthenticatedVisitsNewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
+  AuthenticatedChemistsRoute: typeof AuthenticatedChemistsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedDoctorsRoute: typeof AuthenticatedDoctorsRoute
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRoute
+  AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
+  AuthenticatedWalletRoute: typeof AuthenticatedWalletRoute
+  AuthenticatedDeliveriesIdRoute: typeof AuthenticatedDeliveriesIdRoute
+  AuthenticatedDepositsIdRoute: typeof AuthenticatedDepositsIdRoute
   AuthenticatedInventoryLedgerRoute: typeof AuthenticatedInventoryLedgerRoute
   AuthenticatedInventoryReceiveRoute: typeof AuthenticatedInventoryReceiveRoute
+  AuthenticatedOrdersIdRoute: typeof AuthenticatedOrdersIdRoute
+  AuthenticatedOrdersNewRoute: typeof AuthenticatedOrdersNewRoute
   AuthenticatedRequisitionsIdRoute: typeof AuthenticatedRequisitionsIdRoute
   AuthenticatedRequisitionsNewRoute: typeof AuthenticatedRequisitionsNewRoute
+  AuthenticatedVisitsNewRoute: typeof AuthenticatedVisitsNewRoute
+  AuthenticatedDepositsIndexRoute: typeof AuthenticatedDepositsIndexRoute
   AuthenticatedInventoryIndexRoute: typeof AuthenticatedInventoryIndexRoute
+  AuthenticatedOrdersIndexRoute: typeof AuthenticatedOrdersIndexRoute
   AuthenticatedRequisitionsIndexRoute: typeof AuthenticatedRequisitionsIndexRoute
+  AuthenticatedVisitsIndexRoute: typeof AuthenticatedVisitsIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAuditRoute: AuthenticatedAuditRoute,
+  AuthenticatedChemistsRoute: AuthenticatedChemistsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedDoctorsRoute: AuthenticatedDoctorsRoute,
   AuthenticatedProductsRoute: AuthenticatedProductsRoute,
+  AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedUsersRoute: AuthenticatedUsersRoute,
+  AuthenticatedWalletRoute: AuthenticatedWalletRoute,
+  AuthenticatedDeliveriesIdRoute: AuthenticatedDeliveriesIdRoute,
+  AuthenticatedDepositsIdRoute: AuthenticatedDepositsIdRoute,
   AuthenticatedInventoryLedgerRoute: AuthenticatedInventoryLedgerRoute,
   AuthenticatedInventoryReceiveRoute: AuthenticatedInventoryReceiveRoute,
+  AuthenticatedOrdersIdRoute: AuthenticatedOrdersIdRoute,
+  AuthenticatedOrdersNewRoute: AuthenticatedOrdersNewRoute,
   AuthenticatedRequisitionsIdRoute: AuthenticatedRequisitionsIdRoute,
   AuthenticatedRequisitionsNewRoute: AuthenticatedRequisitionsNewRoute,
+  AuthenticatedVisitsNewRoute: AuthenticatedVisitsNewRoute,
+  AuthenticatedDepositsIndexRoute: AuthenticatedDepositsIndexRoute,
   AuthenticatedInventoryIndexRoute: AuthenticatedInventoryIndexRoute,
+  AuthenticatedOrdersIndexRoute: AuthenticatedOrdersIndexRoute,
   AuthenticatedRequisitionsIndexRoute: AuthenticatedRequisitionsIndexRoute,
+  AuthenticatedVisitsIndexRoute: AuthenticatedVisitsIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

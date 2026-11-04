@@ -74,7 +74,7 @@ export function daysBetween(fromIso: string, toIso: string): number {
 export type RangeKey = "today" | "yesterday" | "week" | "month" | "last_month" | "custom";
 
 export function rangeFor(key: RangeKey, today = todayBD()): { from: string; to: string } {
-  const [y, m] = today.split("-").map(Number);
+  const [y = 2026, m = 1] = today.split("-").map(Number);
   switch (key) {
     case "today":
       return { from: today, to: today };

@@ -92,7 +92,7 @@ export function Qty({ value, className }: { value: unknown; className?: string }
   return <span className={cn("num", className)}>{formatInt(value)}</span>;
 }
 
-export function EmptyState({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
+export function EmptyState({ title, description, action }: { title: string; description?: string | undefined; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-6 py-12 text-center">
       <div className="text-sm font-semibold text-foreground">{title}</div>

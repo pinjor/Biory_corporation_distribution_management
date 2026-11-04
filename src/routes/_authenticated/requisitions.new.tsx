@@ -8,7 +8,7 @@ import { PageHeader, Section, Qty, Field } from "@/components/app/page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { productsQuery, locationsQuery } from "@/lib/queries";
+import { opt, productsQuery, locationsQuery } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { errorMessage } from "@/lib/format";
 
@@ -47,7 +47,7 @@ function NewRequisition() {
     mutationFn: async () => {
       const { data, error } = await supabase.rpc("submit_requisition", {
         p_items: items.map(([product_id, q]) => ({ product_id, qty: q })),
-        p_remarks: remarks || undefined,
+        p_remarks: opt(remarks),
       });
       if (error) throw error;
       return data;
