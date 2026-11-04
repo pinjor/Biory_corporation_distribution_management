@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Boxes,
+  Briefcase,
   Check,
   Copy,
   Eye,
@@ -28,7 +29,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { errorMessage } from "@/lib/format";
 import { clearOfflineCaches } from "@/lib/offline/session-cache";
-import { DEMO_EMAIL, DEMO_PASSWORD, demoLoginEnabled, signInAsDemo } from "@/lib/auth/demo";
+import { DEMO_ACCOUNTS, demoLoginEnabled, signInAsDemo, type DemoKind } from "@/lib/auth/demo";
 import {
   getRememberedEmail,
   getRememberPreference,
@@ -56,6 +57,7 @@ export const Route = createFileRoute("/auth")({
 });
 
 type Mode = "signin" | "signup" | "forgot";
+type Busy = null | "form" | DemoKind;
 
 const HIGHLIGHTS = [
   { icon: Boxes, title: "Batch & expiry stock", text: "FEFO issue on an append-only ledger" },
@@ -77,7 +79,7 @@ function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
   const [remember, setRemember] = useState(true);
-  const [busy, setBusy] = useState<null | "form" | "demo">(null);
+  const [busy, setBusy] = useState<Busy>(null);
   const [sent, setSent] = useState<string | null>(null);
 
   useEffect(() => {
@@ -148,15 +150,19 @@ function AuthPage() {
     }
   }
 
-  async function demo() {
-    setBusy("demo");
-    setEmail(DEMO_EMAIL);
-    setPassword(DEMO_PASSWORD);
+  async function demo(kind: DemoKind) {
+    const account = DEMO_ACCOUNTS[kind];
+    setBusy(kind);
+    setEmail(account.email);
+    setPassword(account.password);
     try {
       setRememberPreference(remember);
-      await signInAsDemo();
-      toast.success("Signed in to the demo workspace", {
-        description: "Every role and menu is unlocked.",
+      await signInAsDemo(kind);
+      toast.success(`Signed in as ${account.name}`, {
+        description:
+          kind === "super_admin"
+            ? "Every admin menu is unlocked."
+            : "You're seeing the field (Sales Officer) view.",
       });
     } catch (err) {
       toast.error(errorMessage(err));
@@ -476,12 +482,25 @@ function BrandPanel() {
   );
 }
 
-function DemoCard({ busy, onDemo }: { busy: null | "form" | "demo"; onDemo: () => void }) {
+const DEMO_CARDS: { kind: DemoKind; icon: typeof ShieldCheck; blurb: string }[] = [
+  {
+    kind: "super_admin",
+    icon: ShieldCheck,
+    blurb: "Stock, requisitions, approvals, users, reports — every admin menu.",
+  },
+  {
+    kind: "sales_officer",
+    icon: Briefcase,
+    blurb: "Book orders, request stock, log visits, collect and deposit.",
+  },
+];
+
+function DemoCard({ busy, onDemo }: { busy: Busy; onDemo: (kind: DemoKind) => void }) {
   const [copied, setCopied] = useState<string | null>(null);
-  async function copy(label: string, value: string) {
+  async function copy(key: string, value: string) {
     try {
       await navigator.clipboard.writeText(value);
-      setCopied(label);
+      setCopied(key);
       setTimeout(() => setCopied(null), 1500);
     } catch {
       /* clipboard blocked */
@@ -496,56 +515,65 @@ function DemoCard({ busy, onDemo }: { busy: null | "form" | "demo"; onDemo: () =
         <div className="min-w-0">
           <div className="font-semibold">Explore the live demo</div>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            One click signs you in with every role — Super Admin, Admin, Finance, Warehouse and
-            Sales Officer — so all menus and features are unlocked.
+            Pick a role — one click signs you in.
           </p>
         </div>
       </div>
-      <Button
-        type="button"
-        variant="highlight"
-        className="group mt-4 h-11 w-full rounded-xl text-[15px]"
-        disabled={busy !== null}
-        onClick={onDemo}
-      >
-        {busy === "demo" ? (
-          <>
-            <Loader2 className="animate-spin" /> Opening demo workspace…
-          </>
-        ) : (
-          <>
-            Try the demo — full access{" "}
-            <ArrowRight className="transition-transform group-hover:translate-x-0.5" />
-          </>
-        )}
-      </Button>
-      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-        {(
-          [
-            ["Email", DEMO_EMAIL],
-            ["Password", DEMO_PASSWORD],
-          ] as const
-        ).map(([label, value]) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => copy(label, value)}
-            className="flex min-w-0 items-center justify-between gap-2 rounded-lg border bg-card/70 px-2.5 py-1.5 text-left transition-colors hover:bg-card"
-            title={`Copy demo ${label.toLowerCase()}`}
-          >
-            <span className="min-w-0">
-              <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">
-                {label}
-              </span>
-              <span className="num block truncate">{value}</span>
-            </span>
-            {copied === label ? (
-              <Check className="size-3.5 shrink-0 text-success" />
-            ) : (
-              <Copy className="size-3.5 shrink-0 text-muted-foreground" />
-            )}
-          </button>
-        ))}
+      <div className="mt-4 grid gap-3">
+        {DEMO_CARDS.map(({ kind, icon: Icon, blurb }) => {
+          const a = DEMO_ACCOUNTS[kind];
+          const primary = kind === "super_admin";
+          return (
+            <div key={kind} className="rounded-xl border bg-card/80 p-3">
+              <Button
+                type="button"
+                variant={primary ? "highlight" : "default"}
+                className="group h-11 w-full justify-between rounded-lg text-[15px]"
+                disabled={busy !== null}
+                onClick={() => onDemo(kind)}
+                data-testid={`demo-${kind}`}
+              >
+                <span className="flex items-center gap-2">
+                  {busy === kind ? <Loader2 className="animate-spin" /> : <Icon />}
+                  {busy === kind ? "Signing in…" : `Demo ${a.role}`}
+                </span>
+                <ArrowRight className="transition-transform group-hover:translate-x-0.5" />
+              </Button>
+              <p className="mt-2 text-xs text-muted-foreground">{blurb}</p>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                {(
+                  [
+                    ["Email", a.email],
+                    ["Password", a.password],
+                  ] as const
+                ).map(([label, value]) => {
+                  const key = `${kind}-${label}`;
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => copy(key, value)}
+                      className="flex min-w-0 items-center justify-between gap-2 rounded-lg border bg-card px-2.5 py-1.5 text-left transition-colors hover:bg-muted"
+                      title={`Copy ${a.role} demo ${label.toLowerCase()}`}
+                    >
+                      <span className="min-w-0">
+                        <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">
+                          {label}
+                        </span>
+                        <span className="num block truncate">{value}</span>
+                      </span>
+                      {copied === key ? (
+                        <Check className="size-3.5 shrink-0 text-success" />
+                      ) : (
+                        <Copy className="size-3.5 shrink-0 text-muted-foreground" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
