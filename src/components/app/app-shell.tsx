@@ -14,6 +14,7 @@ import {
   PackagePlus,
   Pill,
   Receipt,
+  ScrollText,
   Settings,
   SlidersHorizontal,
   ShieldCheck,
@@ -97,6 +98,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
         icon: PackagePlus,
         roles: ["super_admin", "admin", "warehouse_admin"],
       },
+      { to: "/challans", label: "Challans", icon: ScrollText },
       {
         to: "/inventory/opening",
         label: "Opening stock",

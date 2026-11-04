@@ -64,14 +64,27 @@ function RequisitionDetail() {
       return data;
     },
   });
+  const { data: challans = [] } = useQuery({
+    queryKey: ["challans", "requisition", id],
+    enabled: !!r && ["ISSUED", "RECEIVED"].includes(r.status),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("stock_challans")
+        .select("id, challan_no, status, created_at")
+        .eq("requisition_id", id)
+        .order("created_at");
+      if (error) throw error;
+      return data;
+    },
+  });
   const { data: moves = [] } = useQuery({
-    queryKey: ["req-moves", id],
+    queryKey: ["req-moves", id, challans.map((c) => c.id).join(",")],
     enabled: !!r && ["ISSUED", "RECEIVED"].includes(r.status),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("stock_movements")
         .select("*, products(name), batches(batch_no, expiry_date)")
-        .eq("reference_id", id)
+        .in("reference_id", [id, ...challans.map((c) => c.id)])
         .eq("movement_type", "CENTRAL_TO_SO_TRANSFER");
       if (error) throw error;
       return data;
@@ -97,6 +110,8 @@ function RequisitionDetail() {
     qc.invalidateQueries({ queryKey: ["requisition", id] });
     qc.invalidateQueries({ queryKey: ["requisitions"] });
     qc.invalidateQueries({ queryKey: ["stock"] });
+    qc.invalidateQueries({ queryKey: ["challans"] });
+    qc.invalidateQueries({ queryKey: ["my-available-stock"] });
   };
   const decide = useMutation({
     mutationFn: async (reject: boolean) => {
@@ -123,7 +138,9 @@ function RequisitionDetail() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Stock issued to SO (FEFO)");
+      toast.success("Issue challan created", {
+        description: "Stock is in transit until the SO receives the challan.",
+      });
       refresh();
     },
     onError: (e) => toast.error(errorMessage(e)),
@@ -134,7 +151,7 @@ function RequisitionDetail() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Receipt confirmed");
+      toast.success("Challan received", { description: "The stock is now in the SO's inventory." });
       refresh();
     },
     onError: (e) => toast.error(errorMessage(e)),
@@ -176,7 +193,7 @@ function RequisitionDetail() {
             )}
             {canIssue && (
               <Button onClick={() => issue.mutate()} disabled={issue.isPending}>
-                {issue.isPending ? "Issuing…" : "Issue stock (FEFO)"}
+                {issue.isPending ? "Issuing…" : "Issue challan (FEFO)"}
               </Button>
             )}
             {canReceive && (
@@ -185,12 +202,37 @@ function RequisitionDetail() {
                 onClick={() => receive.mutate()}
                 disabled={receive.isPending}
               >
-                {r.so_id === s.userId ? "Confirm received" : "Confirm received for SO"}
+                {r.so_id === s.userId ? "Receive challan" : "Receive challan for SO"}
               </Button>
             )}
           </>
         }
       />
+      {challans.length > 0 && (
+        <div className="mb-6 flex flex-col gap-2">
+          {challans.map((c) => (
+            <Link
+              key={c.id}
+              to="/challans/$id"
+              params={{ id: c.id }}
+              className={
+                "flex flex-wrap items-center justify-between gap-2 rounded-xl border px-4 py-3 text-sm transition-colors hover:bg-muted " +
+                (c.status === "IN_TRANSIT"
+                  ? "border-warning/50 bg-warning-soft/60"
+                  : "bg-success-soft/50")
+              }
+            >
+              <span>
+                Issue challan <span className="num font-semibold">{c.challan_no}</span> ·{" "}
+                {c.status === "IN_TRANSIT"
+                  ? "in transit — waiting for the SO to receive it"
+                  : "received into SO stock"}
+              </span>
+              <span className="font-medium text-primary">View challan →</span>
+            </Link>
+          ))}
+        </div>
+      )}
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <Section title="Items" bodyClassName="p-0">
           <Table>

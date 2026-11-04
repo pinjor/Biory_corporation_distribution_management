@@ -7,6 +7,7 @@ import {
   PackageOpen,
   PackagePlus,
   SlidersHorizontal,
+  Truck,
   UserRound,
   Warehouse,
 } from "lucide-react";
@@ -62,13 +63,20 @@ function InventoryPage() {
   const central = locations.find((l) => l.kind === "central");
   const mine = locations.find((l) => l.so_id === s.userId);
   const soLocs = locations.filter((l) => l.kind === "so");
-  const [tab, setTab] = useState<"central" | "so">(s.isStaff ? "central" : "so");
+  const [tab, setTab] = useState<"central" | "so" | "transit">(s.isStaff ? "central" : "so");
+  const transit = locations.find((l) => l.kind === "transit");
   const [soLoc, setSoLoc] = useState<string>("");
-  const locId = tab === "central" ? central?.id : s.isStaff ? soLoc || soLocs[0]?.id : mine?.id;
+  const locId =
+    tab === "central"
+      ? central?.id
+      : tab === "transit"
+        ? transit?.id
+        : s.isStaff
+          ? soLoc || soLocs[0]?.id
+          : mine?.id;
   const [kind, setKind] = useState("");
   const [expiry, setExpiry] = useState("");
   const [q, setQ] = useState("");
-  const [adjust, setAdjust] = useState<StockRow | null>(null);
   const [transfer, setTransfer] = useState<StockRow | null>(null);
   const near = settings?.near_expiry_days ?? 90;
 
@@ -156,7 +164,7 @@ function InventoryPage() {
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Tabs value={tab} onValueChange={(v) => setTab(v as "central" | "so")}>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as "central" | "so" | "transit")}>
           <TabsList>
             <TabsTrigger value="central">
               <Warehouse /> Central warehouse
@@ -164,6 +172,11 @@ function InventoryPage() {
             <TabsTrigger value="so">
               <UserRound /> {s.isStaff ? "SO stock" : "My stock"}
             </TabsTrigger>
+            {s.isStaff && transit && (
+              <TabsTrigger value="transit">
+                <Truck /> In transit
+              </TabsTrigger>
+            )}
           </TabsList>
         </Tabs>
         {tab === "so" && s.isStaff && (
@@ -334,13 +347,10 @@ function InventoryPage() {
                       >
                         <ArrowLeftRight />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setAdjust(r)}
-                        aria-label="Adjust"
-                      >
-                        <SlidersHorizontal />
+                      <Button variant="ghost" size="icon" asChild aria-label="Adjust">
+                        <Link to="/inventory/adjust">
+                          <SlidersHorizontal />
+                        </Link>
                       </Button>
                     </TableCell>
                   )}
@@ -350,7 +360,6 @@ function InventoryPage() {
           </Table>
         )}
       </Section>
-      {adjust && <AdjustDialog row={adjust} onClose={() => setAdjust(null)} />}
       {transfer && <TransferDialog row={transfer} onClose={() => setTransfer(null)} />}
     </div>
   );
@@ -393,84 +402,14 @@ function MyAvailability() {
   );
 }
 
-const ADJ_TYPES = [
-  ["DAMAGE", "Damage (out)"],
-  ["EXPIRED", "Expired write-off (out)"],
-  ["LOSS", "Loss (out)"],
-  ["MANUAL_ADJUSTMENT_OUT", "Correction (out)"],
-  ["MANUAL_ADJUSTMENT_IN", "Correction (in)"],
-  ["CUSTOMER_RETURN", "Customer return (in)"],
-] as const;
-
-function AdjustDialog({ row, onClose }: { row: StockRow; onClose: () => void }) {
-  const qc = useQueryClient();
-  const [type, setType] = useState<string>("DAMAGE");
-  const [qty, setQty] = useState("");
-  const [reason, setReason] = useState("");
-  const m = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.rpc("adjust_stock", {
-        p_location: row.location_id!,
-        p_batch: row.batch_id!,
-        p_qty: Number(qty),
-        p_type: type,
-        p_reason: reason,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Adjustment posted to the ledger");
-      qc.invalidateQueries({ queryKey: ["stock"] });
-      onClose();
-    },
-    onError: (e) => toast.error(errorMessage(e)),
-  });
-  return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
-            Adjust {row.product_name} · {row.batch_no}
-          </DialogTitle>
-        </DialogHeader>
-        <p className="text-sm text-muted-foreground">
-          On hand at {row.location_name}: <Qty value={row.qty} />
-        </p>
-        <div className="grid gap-4">
-          <Field label="Adjustment type">
-            <NativeSelect value={type} onChange={(e) => setType(e.target.value)}>
-              {ADJ_TYPES.map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field label="Quantity">
-            <Input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} />
-          </Field>
-          <Field label="Reason (required)">
-            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} />
-          </Field>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={() => m.mutate()} disabled={m.isPending || !qty || !reason.trim()}>
-            Post adjustment
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function TransferDialog({ row, onClose }: { row: StockRow; onClose: () => void }) {
   const qc = useQueryClient();
   const { data: locations = [] } = useQuery(locationsQuery);
   const targets = locations.filter(
-    (l) => l.id !== row.location_id && !(row.location_kind === "central" && l.kind === "central"),
+    (l) =>
+      l.kind !== "transit" &&
+      l.id !== row.location_id &&
+      !(row.location_kind === "central" && l.kind === "central"),
   );
   const [to, setTo] = useState(targets[0]?.id ?? "");
   const [qty, setQty] = useState("");

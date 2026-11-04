@@ -50,6 +50,13 @@
       "when": 1793783000000,
       "tag": "0006_two_demo_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793784000000,
+      "tag": "0007_challans",
+      "breakpoints": true
     }
   ]
 }

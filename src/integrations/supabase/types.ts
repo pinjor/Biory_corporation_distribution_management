@@ -997,13 +997,14 @@ export type Database = {
           reorder_level: number
           strength: string | null
           trade_discount_pct: number
+          uom: string | null
           updated_at: string
         }
         Insert: {
           active?: boolean
           base_trp?: number | null
           category?: string | null
-          code: string
+          code?: string
           created_at?: string
           dosage_form?: string | null
           generic_name?: string | null
@@ -1015,6 +1016,7 @@ export type Database = {
           reorder_level?: number
           strength?: string | null
           trade_discount_pct?: number
+          uom?: string | null
           updated_at?: string
         }
         Update: {
@@ -1033,6 +1035,7 @@ export type Database = {
           reorder_level?: number
           strength?: string | null
           trade_discount_pct?: number
+          uom?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1225,6 +1228,137 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_challan_items: {
+        Row: {
+          batch_id: string
+          challan_id: string
+          id: string
+          movement_type: string
+          product_id: string
+          qty: number
+          remarks: string | null
+        }
+        Insert: {
+          batch_id: string
+          challan_id: string
+          id?: string
+          movement_type: string
+          product_id: string
+          qty: number
+          remarks?: string | null
+        }
+        Update: {
+          batch_id?: string
+          challan_id?: string
+          id?: string
+          movement_type?: string
+          product_id?: string
+          qty?: number
+          remarks?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_challan_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_challan_items_challan_id_fkey"
+            columns: ["challan_id"]
+            isOneToOne: false
+            referencedRelation: "stock_challans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_challan_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_challans: {
+        Row: {
+          challan_date: string
+          challan_no: string
+          created_at: string
+          created_by: string | null
+          from_location: string | null
+          id: string
+          idempotency_key: string | null
+          kind: string
+          received_at: string | null
+          received_by: string | null
+          reference: string | null
+          remarks: string | null
+          requisition_id: string | null
+          so_id: string | null
+          status: string
+          to_location: string | null
+        }
+        Insert: {
+          challan_date?: string
+          challan_no: string
+          created_at?: string
+          created_by?: string | null
+          from_location?: string | null
+          id?: string
+          idempotency_key?: string | null
+          kind: string
+          received_at?: string | null
+          received_by?: string | null
+          reference?: string | null
+          remarks?: string | null
+          requisition_id?: string | null
+          so_id?: string | null
+          status?: string
+          to_location?: string | null
+        }
+        Update: {
+          challan_date?: string
+          challan_no?: string
+          created_at?: string
+          created_by?: string | null
+          from_location?: string | null
+          id?: string
+          idempotency_key?: string | null
+          kind?: string
+          received_at?: string | null
+          received_by?: string | null
+          reference?: string | null
+          remarks?: string | null
+          requisition_id?: string | null
+          so_id?: string | null
+          status?: string
+          to_location?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_challans_so_id_fkey"
+            columns: ["so_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_challans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_challans_requisition_id_fkey"
+            columns: ["requisition_id"]
+            isOneToOne: false
+            referencedRelation: "requisitions"
             referencedColumns: ["id"]
           },
         ]
@@ -1680,6 +1814,15 @@ export type Database = {
         }[]
       }
       next_doc_no: { Args: { p_prefix: string }; Returns: string }
+      post_adjustment_challan: {
+        Args: { p_date: string; p_idempotency_key?: string; p_items: Json; p_location: string; p_reason: string }
+        Returns: string
+      }
+      post_stock_challan: {
+        Args: { p_date: string; p_idempotency_key?: string; p_items: Json; p_kind: string; p_reference: string; p_remarks: string }
+        Returns: string
+      }
+      receive_challan: { Args: { p_challan: string }; Returns: undefined }
       receive_requisition: { Args: { p_id: string }; Returns: undefined }
       receive_stock: {
         Args: {
@@ -1777,6 +1920,7 @@ export type Database = {
         Returns: string
       }
       today_bd: { Args: never; Returns: string }
+      transit_location: { Args: never; Returns: string }
       transfer_stock: {
         Args: {
           p_batch: string

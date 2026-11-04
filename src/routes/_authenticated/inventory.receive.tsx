@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@/components/app/page";
-import { BatchReceiptForm, RecentMovements } from "@/components/app/stock-forms";
+import { ChallanTable, StockChallanForm } from "@/components/app/challans";
 import { useSession } from "@/lib/session";
 
 export const Route = createFileRoute("/_authenticated/inventory/receive")({
@@ -23,13 +23,14 @@ function ReceivePage() {
       <PageHeader
         title="Receive stock"
         eyebrow="Inventory"
-        description="Post purchase receipts into the central warehouse, batch by batch. For balances carried over from before the system, use Opening stock."
+        description="Post supplier deliveries into the central warehouse as a receipt challan — one challan, many products."
       />
-      <BatchReceiptForm type="PURCHASE_RECEIPT" />
-      <RecentMovements
-        title="Recent receipts"
-        types={["PURCHASE_RECEIPT"]}
-        empty="Purchase receipts you post will appear here."
+      <StockChallanForm kind="RECEIPT" />
+      <ChallanTable
+        kind="RECEIPT"
+        title="Receipt challans"
+        empty="Receipt challans you post will appear here."
+        className="mt-6"
       />
     </div>
   );

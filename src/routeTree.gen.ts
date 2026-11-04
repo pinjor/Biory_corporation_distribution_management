@@ -22,6 +22,8 @@ import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/users'
 import { Route as AuthenticatedWalletRouteImport } from './routes/_authenticated/wallet'
+import { Route as AuthenticatedChallansIndexRouteImport } from './routes/_authenticated/challans.index'
+import { Route as AuthenticatedChallansIdRouteImport } from './routes/_authenticated/challans.$id'
 import { Route as AuthenticatedDeliveriesIdRouteImport } from './routes/_authenticated/deliveries.$id'
 import { Route as AuthenticatedDepositsIndexRouteImport } from './routes/_authenticated/deposits.index'
 import { Route as AuthenticatedDepositsIdRouteImport } from './routes/_authenticated/deposits.$id'
@@ -104,6 +106,17 @@ const AuthenticatedUsersRoute = AuthenticatedUsersRouteImport.update({
 const AuthenticatedWalletRoute = AuthenticatedWalletRouteImport.update({
   id: '/wallet',
   path: '/wallet',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedChallansIndexRoute =
+  AuthenticatedChallansIndexRouteImport.update({
+    id: '/challans/',
+    path: '/challans/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedChallansIdRoute = AuthenticatedChallansIdRouteImport.update({
+  id: '/challans/$id',
+  path: '/challans/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedDeliveriesIdRoute =
@@ -229,6 +242,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/users': typeof AuthenticatedUsersRoute
   '/wallet': typeof AuthenticatedWalletRoute
+  '/challans/$id': typeof AuthenticatedChallansIdRoute
   '/deliveries/$id': typeof AuthenticatedDeliveriesIdRoute
   '/deposits/$id': typeof AuthenticatedDepositsIdRoute
   '/expenses/$id': typeof AuthenticatedExpensesIdRoute
@@ -242,6 +256,7 @@ export interface FileRoutesByFullPath {
   '/requisitions/$id': typeof AuthenticatedRequisitionsIdRoute
   '/requisitions/new': typeof AuthenticatedRequisitionsNewRoute
   '/visits/new': typeof AuthenticatedVisitsNewRoute
+  '/challans/': typeof AuthenticatedChallansIndexRoute
   '/deposits/': typeof AuthenticatedDepositsIndexRoute
   '/expenses/': typeof AuthenticatedExpensesIndexRoute
   '/inventory/': typeof AuthenticatedInventoryIndexRoute
@@ -262,6 +277,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/users': typeof AuthenticatedUsersRoute
   '/wallet': typeof AuthenticatedWalletRoute
+  '/challans/$id': typeof AuthenticatedChallansIdRoute
   '/deliveries/$id': typeof AuthenticatedDeliveriesIdRoute
   '/deposits/$id': typeof AuthenticatedDepositsIdRoute
   '/expenses/$id': typeof AuthenticatedExpensesIdRoute
@@ -275,6 +291,7 @@ export interface FileRoutesByTo {
   '/requisitions/$id': typeof AuthenticatedRequisitionsIdRoute
   '/requisitions/new': typeof AuthenticatedRequisitionsNewRoute
   '/visits/new': typeof AuthenticatedVisitsNewRoute
+  '/challans': typeof AuthenticatedChallansIndexRoute
   '/deposits': typeof AuthenticatedDepositsIndexRoute
   '/expenses': typeof AuthenticatedExpensesIndexRoute
   '/inventory': typeof AuthenticatedInventoryIndexRoute
@@ -297,6 +314,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/users': typeof AuthenticatedUsersRoute
   '/_authenticated/wallet': typeof AuthenticatedWalletRoute
+  '/_authenticated/challans/$id': typeof AuthenticatedChallansIdRoute
   '/_authenticated/deliveries/$id': typeof AuthenticatedDeliveriesIdRoute
   '/_authenticated/deposits/$id': typeof AuthenticatedDepositsIdRoute
   '/_authenticated/expenses/$id': typeof AuthenticatedExpensesIdRoute
@@ -310,6 +328,7 @@ export interface FileRoutesById {
   '/_authenticated/requisitions/$id': typeof AuthenticatedRequisitionsIdRoute
   '/_authenticated/requisitions/new': typeof AuthenticatedRequisitionsNewRoute
   '/_authenticated/visits/new': typeof AuthenticatedVisitsNewRoute
+  '/_authenticated/challans/': typeof AuthenticatedChallansIndexRoute
   '/_authenticated/deposits/': typeof AuthenticatedDepositsIndexRoute
   '/_authenticated/expenses/': typeof AuthenticatedExpensesIndexRoute
   '/_authenticated/inventory/': typeof AuthenticatedInventoryIndexRoute
@@ -332,6 +351,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/users'
     | '/wallet'
+    | '/challans/$id'
     | '/deliveries/$id'
     | '/deposits/$id'
     | '/expenses/$id'
@@ -345,6 +365,7 @@ export interface FileRouteTypes {
     | '/requisitions/$id'
     | '/requisitions/new'
     | '/visits/new'
+    | '/challans/'
     | '/deposits/'
     | '/expenses/'
     | '/inventory/'
@@ -365,6 +386,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/users'
     | '/wallet'
+    | '/challans/$id'
     | '/deliveries/$id'
     | '/deposits/$id'
     | '/expenses/$id'
@@ -378,6 +400,7 @@ export interface FileRouteTypes {
     | '/requisitions/$id'
     | '/requisitions/new'
     | '/visits/new'
+    | '/challans'
     | '/deposits'
     | '/expenses'
     | '/inventory'
@@ -399,6 +422,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/users'
     | '/_authenticated/wallet'
+    | '/_authenticated/challans/$id'
     | '/_authenticated/deliveries/$id'
     | '/_authenticated/deposits/$id'
     | '/_authenticated/expenses/$id'
@@ -412,6 +436,7 @@ export interface FileRouteTypes {
     | '/_authenticated/requisitions/$id'
     | '/_authenticated/requisitions/new'
     | '/_authenticated/visits/new'
+    | '/_authenticated/challans/'
     | '/_authenticated/deposits/'
     | '/_authenticated/expenses/'
     | '/_authenticated/inventory/'
@@ -518,6 +543,20 @@ declare module '@tanstack/react-router' {
       path: '/wallet'
       fullPath: '/wallet'
       preLoaderRoute: typeof AuthenticatedWalletRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/challans/': {
+      id: '/_authenticated/challans/'
+      path: '/challans'
+      fullPath: '/challans/'
+      preLoaderRoute: typeof AuthenticatedChallansIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/challans/$id': {
+      id: '/_authenticated/challans/$id'
+      path: '/challans/$id'
+      fullPath: '/challans/$id'
+      preLoaderRoute: typeof AuthenticatedChallansIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/deliveries/$id': {
@@ -666,6 +705,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
   AuthenticatedWalletRoute: typeof AuthenticatedWalletRoute
+  AuthenticatedChallansIdRoute: typeof AuthenticatedChallansIdRoute
   AuthenticatedDeliveriesIdRoute: typeof AuthenticatedDeliveriesIdRoute
   AuthenticatedDepositsIdRoute: typeof AuthenticatedDepositsIdRoute
   AuthenticatedExpensesIdRoute: typeof AuthenticatedExpensesIdRoute
@@ -679,6 +719,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedRequisitionsIdRoute: typeof AuthenticatedRequisitionsIdRoute
   AuthenticatedRequisitionsNewRoute: typeof AuthenticatedRequisitionsNewRoute
   AuthenticatedVisitsNewRoute: typeof AuthenticatedVisitsNewRoute
+  AuthenticatedChallansIndexRoute: typeof AuthenticatedChallansIndexRoute
   AuthenticatedDepositsIndexRoute: typeof AuthenticatedDepositsIndexRoute
   AuthenticatedExpensesIndexRoute: typeof AuthenticatedExpensesIndexRoute
   AuthenticatedInventoryIndexRoute: typeof AuthenticatedInventoryIndexRoute
@@ -697,6 +738,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedUsersRoute: AuthenticatedUsersRoute,
   AuthenticatedWalletRoute: AuthenticatedWalletRoute,
+  AuthenticatedChallansIdRoute: AuthenticatedChallansIdRoute,
   AuthenticatedDeliveriesIdRoute: AuthenticatedDeliveriesIdRoute,
   AuthenticatedDepositsIdRoute: AuthenticatedDepositsIdRoute,
   AuthenticatedExpensesIdRoute: AuthenticatedExpensesIdRoute,
@@ -710,6 +752,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedRequisitionsIdRoute: AuthenticatedRequisitionsIdRoute,
   AuthenticatedRequisitionsNewRoute: AuthenticatedRequisitionsNewRoute,
   AuthenticatedVisitsNewRoute: AuthenticatedVisitsNewRoute,
+  AuthenticatedChallansIndexRoute: AuthenticatedChallansIndexRoute,
   AuthenticatedDepositsIndexRoute: AuthenticatedDepositsIndexRoute,
   AuthenticatedExpensesIndexRoute: AuthenticatedExpensesIndexRoute,
   AuthenticatedInventoryIndexRoute: AuthenticatedInventoryIndexRoute,
