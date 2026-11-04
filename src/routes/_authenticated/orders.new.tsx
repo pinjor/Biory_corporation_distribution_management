@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Minus, Plus, Save } from "lucide-react";
+import { AlertTriangle, CloudOff, Minus, Plus, Save } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Section, Money, Qty, Field, EmptyState } from "@/components/app/page";
@@ -9,10 +9,13 @@ import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { myAvailableStockQuery, opt, productsQuery, settingsQuery } from "@/lib/queries";
+import { myAvailableStockQuery, myChemistsQuery, opt, productsQuery, settingsQuery } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { checkDiscounts, computeOrderTotals } from "@/lib/pricing";
 import { errorMessage } from "@/lib/format";
+import { useOffline } from "@/components/app/offline-provider";
+import { classifyRpcError, queuedQtyByProduct } from "@/lib/offline/outbox";
+import { ORDER_DRAFT_KEY as DRAFT_KEY, type OrderDraft as Draft } from "@/lib/offline/order-draft";
 
 export const Route = createFileRoute("/_authenticated/orders/new")({
   validateSearch: (s: Record<string, unknown>): { chemist?: string } =>
@@ -20,16 +23,6 @@ export const Route = createFileRoute("/_authenticated/orders/new")({
   head: () => ({ meta: [{ title: "New order — PharmaField" }] }),
   component: NewOrder,
 });
-
-const DRAFT_KEY = "pf-order-draft";
-
-interface Draft {
-  chemist: string;
-  qty: Record<string, number>;
-  so: string;
-  extra: string;
-  remarks: string;
-}
 
 function NewOrder() {
   const s = useSession();
@@ -39,14 +32,8 @@ function NewOrder() {
   const { data: settings } = useQuery(settingsQuery);
   const { data: products = [] } = useQuery(productsQuery);
   const { data: stock = [] } = useQuery(myAvailableStockQuery);
-  const { data: chemists = [] } = useQuery({
-    queryKey: ["chemists", "mine"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("chemists").select("*").eq("assigned_so", s.userId).eq("status", "active").order("business_name");
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: chemists = [], isPending: chemistsPending } = useQuery(myChemistsQuery(s.userId));
+  const offline = useOffline();
 
   const [chemist, setChemist] = useState(search.chemist ?? "");
   const [qty, setQty] = useState<Record<string, number>>({});
@@ -84,7 +71,12 @@ function NewOrder() {
     localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
   }, [restored, chemist, qty, soPct, extraPct, remarks]);
 
-  const availMap = useMemo(() => new Map(stock.map((r) => [r.product_id, r.available])), [stock]);
+  // Stock already promised to orders still waiting to sync on this device.
+  const queuedQty = useMemo(() => queuedQtyByProduct(offline.queue), [offline.queue]);
+  const availMap = useMemo(
+    () => new Map(stock.map((r) => [r.product_id, Math.max(0, r.available - (queuedQty.get(r.product_id) ?? 0))])),
+    [stock, queuedQty],
+  );
   const saleable = products.filter((p) => p.active && p.kind === "saleable");
   const visible = saleable.filter((p) => !q || `${p.name} ${p.code} ${p.generic_name ?? ""}`.toLowerCase().includes(q.toLowerCase()));
   const lines = saleable.filter((p) => (qty[p.id] ?? 0) > 0).map((p) => ({ product: p, qty: qty[p.id] ?? 0 }));
@@ -96,9 +88,28 @@ function NewOrder() {
   const overStock = lines.filter((l) => l.qty > (availMap.get(l.product.id) ?? 0));
   const selectedChemist = chemists.find((c) => c.id === chemist);
 
+  const queueOffline = (why: "offline" | "dropped") => {
+    offline.queueOrder({
+      id: idemKey,
+      chemistId: chemist,
+      chemistName: selectedChemist?.business_name ?? "Chemist",
+      items: lines.map((l) => ({ product_id: l.product.id, qty: l.qty, name: l.product.name, mrp: Number(l.product.mrp), base_trp: Number(l.product.base_trp) })),
+      soPct: so,
+      extraPct: extra,
+      remarks,
+      netEstimate: totals.net,
+    });
+    localStorage.removeItem(DRAFT_KEY);
+    toast.success(why === "offline" ? "Saved on this device — it will sync automatically when you're back online" : "Connection dropped — order saved on this device and will sync automatically");
+    navigate({ to: "/orders" });
+  };
+
   const save = useMutation({
+    // Run even when offline — the handler itself decides to queue the order on the device.
+    networkMode: "always",
     mutationFn: async () => {
-      const { data, error } = await supabase.rpc("create_order", {
+      if (!navigator.onLine) return { queued: true as const };
+      const { data, error, status } = await supabase.rpc("create_order", {
         p_chemist: chemist,
         p_items: lines.map((l) => ({ product_id: l.product.id, qty: l.qty })),
         p_so_discount_pct: so,
@@ -106,17 +117,26 @@ function NewOrder() {
         p_remarks: opt(remarks),
         p_idempotency_key: idemKey,
       });
-      if (error) throw error;
-      return data as string;
+      if (error) {
+        // No definitive answer from the server: keep it on the device (same idempotency key, so no duplicate).
+        if (classifyRpcError({ error, status }) === "retry") return { queued: true as const };
+        throw error;
+      }
+      return { queued: false as const, id: data as string };
     },
-    onSuccess: (id) => {
+    onSuccess: (r) => {
+      if (r.queued) return queueOffline(navigator.onLine ? "dropped" : "offline");
+      const id = r.id;
       localStorage.removeItem(DRAFT_KEY);
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["my-available-stock"] });
       toast.success("Order saved");
       navigate({ to: "/orders/$id", params: { id } });
     },
-    onError: (e) => toast.error(errorMessage(e)),
+    onError: (e) => {
+      if (e instanceof TypeError) return queueOffline("dropped");
+      toast.error(errorMessage(e));
+    },
   });
 
   if (!s.isSO) return <PageHeader title="New order" description="Only Sales Officers can book orders." />;
@@ -126,10 +146,21 @@ function NewOrder() {
   return (
     <div className="pb-6">
       <PageHeader title="New order" description="Prices come from the product master and are locked into the order when you save." />
+      {!offline.online && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl bg-warning-soft px-4 py-3 text-sm text-warning-foreground">
+          <CloudOff className="mt-0.5 size-4 shrink-0" />
+          <span>
+            You're offline. You can still book this order — it's kept on this device and sent automatically when the connection returns. Stock and
+            prices shown are from your last sync; the server re-checks them when the order arrives.
+          </span>
+        </div>
+      )}
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <div className="flex flex-col gap-6">
           <Section title="Chemist">
-            {chemists.length === 0 ? (
+            {chemists.length === 0 && !offline.online && chemistsPending ? (
+              <EmptyState title="Your chemist list isn't on this device yet" description="Connect to the internet once so PharmaField can download your chemists and products." />
+            ) : chemists.length === 0 ? (
               <EmptyState
                 title="No chemists assigned to you"
                 action={<Button asChild size="sm"><Link to="/chemists">Add a chemist</Link></Button>}
@@ -237,9 +268,11 @@ function NewOrder() {
               disabled={!chemist || lines.length === 0 || disc.errors.length > 0 || overStock.length > 0 || save.isPending}
               onClick={() => save.mutate()}
             >
-              <Save /> {save.isPending ? "Saving…" : "Save order"}
+              {offline.online ? <Save /> : <CloudOff />} {save.isPending ? "Saving…" : offline.online ? "Save order" : "Save offline"}
             </Button>
-            <p className="mt-2 text-center text-xs text-muted-foreground">Draft is kept on this device until saved.</p>
+            <p className="mt-2 text-center text-xs text-muted-foreground">
+              {offline.online ? "Draft is kept on this device until saved." : "Will sync automatically when you're back online."}
+            </p>
           </Section>
         </div>
       </div>

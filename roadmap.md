@@ -14,8 +14,11 @@
 - [x] Doctor visits with promo stock issue
 - [x] Reports with CSV export, users & roles, audit log, notifications
 
+## Phase 2
+- [x] Expenses: staff submit with receipts → Finance approve/reject (+ submitter can cancel while pending)
+- [x] Offline orders: queue on device when disconnected, auto-sync on reconnect, cached chemists/products/stock, offline-tolerant sign-in gate
+- [x] Installable app shell that opens offline (published app only)
+
 ## Later
-- Expenses module
-- Offline order drafts / mutation queue
 - PDF exports (server-generated), SMS/push adapters
 - Barcode/DataMatrix scanning, recall workflow, GPS rules

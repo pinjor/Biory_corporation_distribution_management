@@ -25,6 +25,9 @@ import { Route as AuthenticatedWalletRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedDeliveriesIdRouteImport } from './routes/_authenticated/deliveries.$id'
 import { Route as AuthenticatedDepositsIndexRouteImport } from './routes/_authenticated/deposits.index'
 import { Route as AuthenticatedDepositsIdRouteImport } from './routes/_authenticated/deposits.$id'
+import { Route as AuthenticatedExpensesIndexRouteImport } from './routes/_authenticated/expenses.index'
+import { Route as AuthenticatedExpensesIdRouteImport } from './routes/_authenticated/expenses.$id'
+import { Route as AuthenticatedExpensesNewRouteImport } from './routes/_authenticated/expenses.new'
 import { Route as AuthenticatedInventoryIndexRouteImport } from './routes/_authenticated/inventory.index'
 import { Route as AuthenticatedInventoryLedgerRouteImport } from './routes/_authenticated/inventory.ledger'
 import { Route as AuthenticatedInventoryReceiveRouteImport } from './routes/_authenticated/inventory.receive'
@@ -118,6 +121,23 @@ const AuthenticatedDepositsIdRoute = AuthenticatedDepositsIdRouteImport.update({
   path: '/deposits/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedExpensesIndexRoute =
+  AuthenticatedExpensesIndexRouteImport.update({
+    id: '/expenses/',
+    path: '/expenses/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedExpensesIdRoute = AuthenticatedExpensesIdRouteImport.update({
+  id: '/expenses/$id',
+  path: '/expenses/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedExpensesNewRoute =
+  AuthenticatedExpensesNewRouteImport.update({
+    id: '/expenses/new',
+    path: '/expenses/new',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedInventoryIndexRoute =
   AuthenticatedInventoryIndexRouteImport.update({
     id: '/inventory/',
@@ -197,6 +217,8 @@ export interface FileRoutesByFullPath {
   '/wallet': typeof AuthenticatedWalletRoute
   '/deliveries/$id': typeof AuthenticatedDeliveriesIdRoute
   '/deposits/$id': typeof AuthenticatedDepositsIdRoute
+  '/expenses/$id': typeof AuthenticatedExpensesIdRoute
+  '/expenses/new': typeof AuthenticatedExpensesNewRoute
   '/inventory/ledger': typeof AuthenticatedInventoryLedgerRoute
   '/inventory/receive': typeof AuthenticatedInventoryReceiveRoute
   '/orders/$id': typeof AuthenticatedOrdersIdRoute
@@ -205,6 +227,7 @@ export interface FileRoutesByFullPath {
   '/requisitions/new': typeof AuthenticatedRequisitionsNewRoute
   '/visits/new': typeof AuthenticatedVisitsNewRoute
   '/deposits/': typeof AuthenticatedDepositsIndexRoute
+  '/expenses/': typeof AuthenticatedExpensesIndexRoute
   '/inventory/': typeof AuthenticatedInventoryIndexRoute
   '/orders/': typeof AuthenticatedOrdersIndexRoute
   '/requisitions/': typeof AuthenticatedRequisitionsIndexRoute
@@ -225,6 +248,8 @@ export interface FileRoutesByTo {
   '/wallet': typeof AuthenticatedWalletRoute
   '/deliveries/$id': typeof AuthenticatedDeliveriesIdRoute
   '/deposits/$id': typeof AuthenticatedDepositsIdRoute
+  '/expenses/$id': typeof AuthenticatedExpensesIdRoute
+  '/expenses/new': typeof AuthenticatedExpensesNewRoute
   '/inventory/ledger': typeof AuthenticatedInventoryLedgerRoute
   '/inventory/receive': typeof AuthenticatedInventoryReceiveRoute
   '/orders/$id': typeof AuthenticatedOrdersIdRoute
@@ -233,6 +258,7 @@ export interface FileRoutesByTo {
   '/requisitions/new': typeof AuthenticatedRequisitionsNewRoute
   '/visits/new': typeof AuthenticatedVisitsNewRoute
   '/deposits': typeof AuthenticatedDepositsIndexRoute
+  '/expenses': typeof AuthenticatedExpensesIndexRoute
   '/inventory': typeof AuthenticatedInventoryIndexRoute
   '/orders': typeof AuthenticatedOrdersIndexRoute
   '/requisitions': typeof AuthenticatedRequisitionsIndexRoute
@@ -255,6 +281,8 @@ export interface FileRoutesById {
   '/_authenticated/wallet': typeof AuthenticatedWalletRoute
   '/_authenticated/deliveries/$id': typeof AuthenticatedDeliveriesIdRoute
   '/_authenticated/deposits/$id': typeof AuthenticatedDepositsIdRoute
+  '/_authenticated/expenses/$id': typeof AuthenticatedExpensesIdRoute
+  '/_authenticated/expenses/new': typeof AuthenticatedExpensesNewRoute
   '/_authenticated/inventory/ledger': typeof AuthenticatedInventoryLedgerRoute
   '/_authenticated/inventory/receive': typeof AuthenticatedInventoryReceiveRoute
   '/_authenticated/orders/$id': typeof AuthenticatedOrdersIdRoute
@@ -263,6 +291,7 @@ export interface FileRoutesById {
   '/_authenticated/requisitions/new': typeof AuthenticatedRequisitionsNewRoute
   '/_authenticated/visits/new': typeof AuthenticatedVisitsNewRoute
   '/_authenticated/deposits/': typeof AuthenticatedDepositsIndexRoute
+  '/_authenticated/expenses/': typeof AuthenticatedExpensesIndexRoute
   '/_authenticated/inventory/': typeof AuthenticatedInventoryIndexRoute
   '/_authenticated/orders/': typeof AuthenticatedOrdersIndexRoute
   '/_authenticated/requisitions/': typeof AuthenticatedRequisitionsIndexRoute
@@ -285,6 +314,8 @@ export interface FileRouteTypes {
     | '/wallet'
     | '/deliveries/$id'
     | '/deposits/$id'
+    | '/expenses/$id'
+    | '/expenses/new'
     | '/inventory/ledger'
     | '/inventory/receive'
     | '/orders/$id'
@@ -293,6 +324,7 @@ export interface FileRouteTypes {
     | '/requisitions/new'
     | '/visits/new'
     | '/deposits/'
+    | '/expenses/'
     | '/inventory/'
     | '/orders/'
     | '/requisitions/'
@@ -313,6 +345,8 @@ export interface FileRouteTypes {
     | '/wallet'
     | '/deliveries/$id'
     | '/deposits/$id'
+    | '/expenses/$id'
+    | '/expenses/new'
     | '/inventory/ledger'
     | '/inventory/receive'
     | '/orders/$id'
@@ -321,6 +355,7 @@ export interface FileRouteTypes {
     | '/requisitions/new'
     | '/visits/new'
     | '/deposits'
+    | '/expenses'
     | '/inventory'
     | '/orders'
     | '/requisitions'
@@ -342,6 +377,8 @@ export interface FileRouteTypes {
     | '/_authenticated/wallet'
     | '/_authenticated/deliveries/$id'
     | '/_authenticated/deposits/$id'
+    | '/_authenticated/expenses/$id'
+    | '/_authenticated/expenses/new'
     | '/_authenticated/inventory/ledger'
     | '/_authenticated/inventory/receive'
     | '/_authenticated/orders/$id'
@@ -350,6 +387,7 @@ export interface FileRouteTypes {
     | '/_authenticated/requisitions/new'
     | '/_authenticated/visits/new'
     | '/_authenticated/deposits/'
+    | '/_authenticated/expenses/'
     | '/_authenticated/inventory/'
     | '/_authenticated/orders/'
     | '/_authenticated/requisitions/'
@@ -477,6 +515,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDepositsIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/expenses/': {
+      id: '/_authenticated/expenses/'
+      path: '/expenses'
+      fullPath: '/expenses/'
+      preLoaderRoute: typeof AuthenticatedExpensesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/expenses/$id': {
+      id: '/_authenticated/expenses/$id'
+      path: '/expenses/$id'
+      fullPath: '/expenses/$id'
+      preLoaderRoute: typeof AuthenticatedExpensesIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/expenses/new': {
+      id: '/_authenticated/expenses/new'
+      path: '/expenses/new'
+      fullPath: '/expenses/new'
+      preLoaderRoute: typeof AuthenticatedExpensesNewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/inventory/': {
       id: '/_authenticated/inventory/'
       path: '/inventory'
@@ -569,6 +628,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedWalletRoute: typeof AuthenticatedWalletRoute
   AuthenticatedDeliveriesIdRoute: typeof AuthenticatedDeliveriesIdRoute
   AuthenticatedDepositsIdRoute: typeof AuthenticatedDepositsIdRoute
+  AuthenticatedExpensesIdRoute: typeof AuthenticatedExpensesIdRoute
+  AuthenticatedExpensesNewRoute: typeof AuthenticatedExpensesNewRoute
   AuthenticatedInventoryLedgerRoute: typeof AuthenticatedInventoryLedgerRoute
   AuthenticatedInventoryReceiveRoute: typeof AuthenticatedInventoryReceiveRoute
   AuthenticatedOrdersIdRoute: typeof AuthenticatedOrdersIdRoute
@@ -577,6 +638,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedRequisitionsNewRoute: typeof AuthenticatedRequisitionsNewRoute
   AuthenticatedVisitsNewRoute: typeof AuthenticatedVisitsNewRoute
   AuthenticatedDepositsIndexRoute: typeof AuthenticatedDepositsIndexRoute
+  AuthenticatedExpensesIndexRoute: typeof AuthenticatedExpensesIndexRoute
   AuthenticatedInventoryIndexRoute: typeof AuthenticatedInventoryIndexRoute
   AuthenticatedOrdersIndexRoute: typeof AuthenticatedOrdersIndexRoute
   AuthenticatedRequisitionsIndexRoute: typeof AuthenticatedRequisitionsIndexRoute
@@ -595,6 +657,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedWalletRoute: AuthenticatedWalletRoute,
   AuthenticatedDeliveriesIdRoute: AuthenticatedDeliveriesIdRoute,
   AuthenticatedDepositsIdRoute: AuthenticatedDepositsIdRoute,
+  AuthenticatedExpensesIdRoute: AuthenticatedExpensesIdRoute,
+  AuthenticatedExpensesNewRoute: AuthenticatedExpensesNewRoute,
   AuthenticatedInventoryLedgerRoute: AuthenticatedInventoryLedgerRoute,
   AuthenticatedInventoryReceiveRoute: AuthenticatedInventoryReceiveRoute,
   AuthenticatedOrdersIdRoute: AuthenticatedOrdersIdRoute,
@@ -603,6 +667,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedRequisitionsNewRoute: AuthenticatedRequisitionsNewRoute,
   AuthenticatedVisitsNewRoute: AuthenticatedVisitsNewRoute,
   AuthenticatedDepositsIndexRoute: AuthenticatedDepositsIndexRoute,
+  AuthenticatedExpensesIndexRoute: AuthenticatedExpensesIndexRoute,
   AuthenticatedInventoryIndexRoute: AuthenticatedInventoryIndexRoute,
   AuthenticatedOrdersIndexRoute: AuthenticatedOrdersIndexRoute,
   AuthenticatedRequisitionsIndexRoute: AuthenticatedRequisitionsIndexRoute,

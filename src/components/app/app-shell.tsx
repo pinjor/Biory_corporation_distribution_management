@@ -12,6 +12,7 @@ import {
   Package,
   PackagePlus,
   Pill,
+  Receipt,
   Settings,
   ShieldCheck,
   ShoppingCart,
@@ -51,6 +52,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ROLE_LABELS, useSession, type AppRole } from "@/lib/session";
 import { formatDateTime } from "@/lib/format";
+import { OfflineProvider, useOffline } from "@/components/app/offline-provider";
+import { SyncStatusChip } from "@/components/app/sync-status";
+import { clearOfflineCaches } from "@/lib/offline/session-cache";
 
 interface NavItem {
   to: NonNullable<LinkProps["to"]>;
@@ -64,7 +68,12 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: "Sales",
     items: [
-      { to: "/orders", label: "Orders", icon: ShoppingCart, roles: ["super_admin", "admin", "finance_admin", "warehouse_admin", "sales_officer"] },
+      {
+        to: "/orders",
+        label: "Orders",
+        icon: ShoppingCart,
+        roles: ["super_admin", "admin", "finance_admin", "warehouse_admin", "sales_officer"],
+      },
       { to: "/chemists", label: "Chemists", icon: Store },
       { to: "/doctors", label: "Doctors", icon: UserRound },
       { to: "/visits", label: "Doctor visits", icon: Stethoscope },
@@ -74,16 +83,37 @@ const NAV: { group: string; items: NavItem[] }[] = [
     group: "Inventory",
     items: [
       { to: "/inventory", label: "Stock", icon: Boxes },
-      { to: "/requisitions", label: "Requisitions", icon: ClipboardList, roles: ["super_admin", "admin", "warehouse_admin", "sales_officer"] },
-      { to: "/inventory/receive", label: "Receive stock", icon: PackagePlus, roles: ["super_admin", "admin", "warehouse_admin"] },
+      {
+        to: "/requisitions",
+        label: "Requisitions",
+        icon: ClipboardList,
+        roles: ["super_admin", "admin", "warehouse_admin", "sales_officer"],
+      },
+      {
+        to: "/inventory/receive",
+        label: "Receive stock",
+        icon: PackagePlus,
+        roles: ["super_admin", "admin", "warehouse_admin"],
+      },
       { to: "/products", label: "Products", icon: Pill },
     ],
   },
   {
     group: "Money",
     items: [
-      { to: "/wallet", label: "Wallet", icon: Wallet, roles: ["super_admin", "admin", "finance_admin", "sales_officer"] },
-      { to: "/deposits", label: "Deposits", icon: HandCoins, roles: ["super_admin", "admin", "finance_admin", "sales_officer"] },
+      {
+        to: "/wallet",
+        label: "Wallet",
+        icon: Wallet,
+        roles: ["super_admin", "admin", "finance_admin", "sales_officer"],
+      },
+      {
+        to: "/deposits",
+        label: "Deposits",
+        icon: HandCoins,
+        roles: ["super_admin", "admin", "finance_admin", "sales_officer"],
+      },
+      { to: "/expenses", label: "Expenses", icon: Receipt },
     ],
   },
   {
@@ -94,7 +124,12 @@ const NAV: { group: string; items: NavItem[] }[] = [
     group: "Administration",
     items: [
       { to: "/users", label: "Users & roles", icon: Users, roles: ["super_admin", "admin"] },
-      { to: "/settings", label: "Pricing & policy", icon: Settings, roles: ["super_admin", "admin"] },
+      {
+        to: "/settings",
+        label: "Pricing & policy",
+        icon: Settings,
+        roles: ["super_admin", "admin"],
+      },
       { to: "/audit", label: "Audit log", icon: FileClock, roles: ["super_admin", "admin"] },
     ],
   },
@@ -104,23 +139,28 @@ export function AppShell() {
   const session = useSession();
   if (session.roles.length === 0) return <AwaitingAccess />;
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset className="bg-background">
-        <header className="no-print sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-background/85 px-3 backdrop-blur sm:px-5">
-          <SidebarTrigger />
-          <div className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
-            {session.profile?.so_code && <span className="num mr-2 text-foreground">{session.profile.so_code}</span>}
-            {session.roles.map((r) => ROLE_LABELS[r]).join(" · ")}
-          </div>
-          <NotificationsBell />
-          <UserMenu />
-        </header>
-        <main className="mx-auto w-full max-w-7xl flex-1 px-3 py-6 sm:px-6">
-          <Outlet />
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+    <OfflineProvider>
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset className="bg-background">
+          <header className="no-print sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-background/85 px-3 backdrop-blur sm:px-5">
+            <SidebarTrigger />
+            <div className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+              {session.profile?.so_code && (
+                <span className="num mr-2 text-foreground">{session.profile.so_code}</span>
+              )}
+              {session.roles.map((r) => ROLE_LABELS[r]).join(" · ")}
+            </div>
+            <SyncStatusChip />
+            <NotificationsBell />
+            <UserMenu />
+          </header>
+          <main className="mx-auto w-full max-w-7xl flex-1 px-3 py-6 sm:px-6">
+            <Outlet />
+          </main>
+        </SidebarInset>
+      </SidebarProvider>
+    </OfflineProvider>
   );
 }
 
@@ -200,7 +240,10 @@ function NotificationsBell() {
   const unread = data.filter((n) => !n.read_at).length;
   const markAll = useMutation({
     mutationFn: async () => {
-      await supabase.from("notifications").update({ read_at: new Date().toISOString() }).is("read_at", null);
+      await supabase
+        .from("notifications")
+        .update({ read_at: new Date().toISOString() })
+        .is("read_at", null);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
   });
@@ -220,28 +263,44 @@ function NotificationsBell() {
         <div className="flex items-center justify-between border-b px-3 py-2">
           <span className="text-sm font-semibold">Notifications</span>
           {unread > 0 && (
-            <button className="text-xs text-primary hover:underline" onClick={() => markAll.mutate()}>
+            <button
+              className="text-xs text-primary hover:underline"
+              onClick={() => markAll.mutate()}
+            >
               Mark all read
             </button>
           )}
         </div>
         <div className="max-h-96 overflow-y-auto">
-          {data.length === 0 && <p className="p-4 text-sm text-muted-foreground">You're all caught up.</p>}
+          {data.length === 0 && (
+            <p className="p-4 text-sm text-muted-foreground">You're all caught up.</p>
+          )}
           {data.map((n) => (
             <button
               key={n.id}
               className="flex w-full flex-col items-start gap-0.5 border-b px-3 py-2 text-left last:border-0 hover:bg-muted"
               onClick={async () => {
                 if (!n.read_at) {
-                  await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", n.id);
+                  await supabase
+                    .from("notifications")
+                    .update({ read_at: new Date().toISOString() })
+                    .eq("id", n.id);
                   qc.invalidateQueries({ queryKey: ["notifications"] });
                 }
                 if (n.link) navigate({ href: n.link });
               }}
             >
-              <span className={`text-sm ${n.read_at ? "text-muted-foreground" : "font-semibold text-foreground"}`}>{n.title}</span>
-              {n.body && <span className="line-clamp-2 text-xs text-muted-foreground">{n.body}</span>}
-              <span className="text-[10px] text-muted-foreground">{formatDateTime(n.created_at)}</span>
+              <span
+                className={`text-sm ${n.read_at ? "text-muted-foreground" : "font-semibold text-foreground"}`}
+              >
+                {n.title}
+              </span>
+              {n.body && (
+                <span className="line-clamp-2 text-xs text-muted-foreground">{n.body}</span>
+              )}
+              <span className="text-[10px] text-muted-foreground">
+                {formatDateTime(n.created_at)}
+              </span>
             </button>
           ))}
         </div>
@@ -254,9 +313,18 @@ function UserMenu() {
   const session = useSession();
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { queue } = useOffline();
   async function signOut() {
+    if (
+      queue.length > 0 &&
+      !window.confirm(
+        `${queue.length} order(s) haven't synced yet. They stay on this device and sync the next time you sign in here. Sign out anyway?`,
+      )
+    )
+      return;
     await qc.cancelQueries();
     qc.clear();
+    clearOfflineCaches();
     await supabase.auth.signOut();
     navigate({ to: "/auth", replace: true });
   }
@@ -295,8 +363,9 @@ function AwaitingAccess() {
         <Package className="mx-auto size-10 text-primary" />
         <h1 className="mt-4 text-xl font-semibold">Waiting for access</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          You're signed in as <span className="font-medium text-foreground">{session.email}</span>. A Super Admin needs to
-          assign your role (for example Sales Officer or Warehouse Admin) before you can use PharmaField.
+          You're signed in as <span className="font-medium text-foreground">{session.email}</span>.
+          A Super Admin needs to assign your role (for example Sales Officer or Warehouse Admin)
+          before you can use PharmaField.
         </p>
         <div className="mt-6 flex justify-center gap-2">
           <Button variant="outline" onClick={() => window.location.reload()}>
@@ -306,6 +375,7 @@ function AwaitingAccess() {
             variant="ghost"
             onClick={async () => {
               qc.clear();
+              clearOfflineCaches();
               await supabase.auth.signOut();
               navigate({ to: "/auth", replace: true });
             }}

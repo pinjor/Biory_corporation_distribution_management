@@ -12,6 +12,7 @@ import { salesOfficersQuery, territoriesQuery } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { addDays, formatDate, todayBD } from "@/lib/format";
 import { downloadCsv } from "@/lib/csv";
+import { QueuedOrdersPanel } from "@/components/app/sync-status";
 
 export const Route = createFileRoute("/_authenticated/orders/")({
   head: () => ({ meta: [{ title: "Orders — PharmaField" }] }),
@@ -43,7 +44,7 @@ function OrdersPage() {
   const { data: sos = [] } = useQuery({ ...salesOfficersQuery, enabled: s.isStaff });
   const { data: territories = [] } = useQuery(territoriesQuery);
 
-  const { data = [], isLoading } = useQuery({
+  const { data = [], isLoading, fetchStatus } = useQuery({
     queryKey: ["orders", view, so, from, to],
     queryFn: async () => {
       let qq = supabase
@@ -108,6 +109,7 @@ function OrdersPage() {
           </>
         }
       />
+      {s.isSO && <QueuedOrdersPanel />}
       <div className="mb-4 flex gap-1 overflow-x-auto pb-1">
         {VIEWS.map((v) => (
           <Button key={v.key} size="sm" variant={view === v.key ? "default" : "ghost"} onClick={() => setView(v.key)}>
@@ -140,7 +142,9 @@ function OrdersPage() {
           </div>
         }
       >
-        {isLoading ? (
+        {isLoading && fetchStatus === "paused" ? (
+          <div className="p-6 text-sm text-muted-foreground">You're offline. Order history appears here once you're connected again.</div>
+        ) : isLoading ? (
           <div className="p-6 text-sm text-muted-foreground">Loading…</div>
         ) : rows.length === 0 ? (
           <div className="p-5"><EmptyState title="No orders here" /></div>

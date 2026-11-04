@@ -132,7 +132,7 @@ const STATUS_VARIANTS: Record<string, BadgeProps["variant"]> = {
   OK: "success",
 };
 
-export function StatusBadge({ status, label }: { status: string | null | undefined; label?: string }) {
+export function StatusBadge({ status, label }: { status: string | null | undefined; label?: string | undefined }) {
   if (!status) return null;
   const text = label ?? status.replace(/_/g, " ").toLowerCase();
   return <Badge variant={STATUS_VARIANTS[status] ?? "outline"}>{text}</Badge>;

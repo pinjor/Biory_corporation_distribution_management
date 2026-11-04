@@ -691,6 +691,72 @@ export type Database = {
           },
         ]
       }
+      expenses: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          description: string
+          expense_date: string
+          expense_no: string
+          id: string
+          idempotency_key: string | null
+          receipt_paths: string[]
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          submitted_by: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          created_at?: string
+          description: string
+          expense_date?: string
+          expense_no: string
+          id?: string
+          idempotency_key?: string | null
+          receipt_paths?: string[]
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submitted_by: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description?: string
+          expense_date?: string
+          expense_no?: string
+          id?: string
+          idempotency_key?: string | null
+          receipt_paths?: string[]
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submitted_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "v_wallet_summary"
+            referencedColumns: ["so_id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           created_at: string
@@ -1526,6 +1592,7 @@ export type Database = {
         Returns: undefined
       }
       can_view_location: { Args: { _loc: string }; Returns: boolean }
+      cancel_expense: { Args: { p_id: string }; Returns: undefined }
       cancel_order: {
         Args: { p_id: string; p_reason: string }
         Returns: undefined
@@ -1659,6 +1726,10 @@ export type Database = {
         Args: { p_approve: boolean; p_id: string; p_reason: string }
         Returns: undefined
       }
+      review_expense: {
+        Args: { p_approve: boolean; p_id: string; p_note: string }
+        Returns: undefined
+      }
       set_user_role: {
         Args: {
           p_grant: boolean
@@ -1680,6 +1751,17 @@ export type Database = {
           p_received_by: string
           p_remarks: string
           p_transaction_id: string
+        }
+        Returns: string
+      }
+      submit_expense: {
+        Args: {
+          p_amount: number
+          p_category: string
+          p_date: string
+          p_description: string
+          p_idempotency_key: string
+          p_receipt_paths: string[]
         }
         Returns: string
       }

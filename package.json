@@ -47,7 +47,9 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@supabase/supabase-js": "^2.118.0",
     "@tailwindcss/vite": "^4.2.1",
-    "@tanstack/react-query": "^5.101.1",
+    "@tanstack/query-sync-storage-persister": "^5.101",
+    "@tanstack/react-query": "5.105.3",
+    "@tanstack/react-query-persist-client": "^5.101",
     "@tanstack/react-router": "1.170.41",
     "@tanstack/react-start": "1.168.60",
     "@tanstack/router-plugin": "1.168.42",
@@ -96,6 +98,8 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
     "vite": "8.1.5",
-    "vitest": "^4.1.10"
+    "vite-plugin-pwa": "^2.0.0",
+    "vitest": "^4.1.10",
+    "workbox-window": "^7.4.1"
   }
 }

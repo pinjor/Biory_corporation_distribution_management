@@ -1,6 +1,10 @@
 import { queryOptions } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+/** Lists the order form needs offline are kept for a day in memory and persisted on the device. */
+const OFFLINE_GC = 24 * 60 * 60 * 1000;
+export const OFFLINE_QUERY_ROOTS = new Set(["settings", "products", "chemists", "my-available-stock", "territories"]);
+
 export const settingsQuery = queryOptions({
   queryKey: ["settings"],
   queryFn: async () => {
@@ -9,6 +13,7 @@ export const settingsQuery = queryOptions({
     return data;
   },
   staleTime: 60_000,
+  gcTime: OFFLINE_GC,
 });
 
 export const productsQuery = queryOptions({
@@ -19,6 +24,7 @@ export const productsQuery = queryOptions({
     return data;
   },
   staleTime: 30_000,
+  gcTime: OFFLINE_GC,
 });
 
 export const territoriesQuery = queryOptions({
@@ -73,7 +79,25 @@ export const myAvailableStockQuery = queryOptions({
     if (error) throw error;
     return data;
   },
+  gcTime: OFFLINE_GC,
 });
+
+/** Active chemists assigned to this Sales Officer (used by the order form, also offline). */
+export const myChemistsQuery = (userId: string) =>
+  queryOptions({
+    queryKey: ["chemists", "mine", userId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("chemists")
+        .select("*")
+        .eq("assigned_so", userId)
+        .eq("status", "active")
+        .order("business_name");
+      if (error) throw error;
+      return data;
+    },
+    gcTime: OFFLINE_GC,
+  });
 
 /** Drop undefined/empty-string values so optional RPC args are simply omitted. */
 export function clean<T extends Record<string, unknown>>(o: T): T {
