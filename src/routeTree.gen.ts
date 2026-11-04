@@ -10,33 +10,185 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedInventoryIndexRouteImport } from './routes/_authenticated/inventory.index'
+import { Route as AuthenticatedInventoryLedgerRouteImport } from './routes/_authenticated/inventory.ledger'
+import { Route as AuthenticatedInventoryReceiveRouteImport } from './routes/_authenticated/inventory.receive'
+import { Route as AuthenticatedRequisitionsIndexRouteImport } from './routes/_authenticated/requisitions.index'
+import { Route as AuthenticatedRequisitionsIdRouteImport } from './routes/_authenticated/requisitions.$id'
+import { Route as AuthenticatedRequisitionsNewRouteImport } from './routes/_authenticated/requisitions.new'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedProductsRoute = AuthenticatedProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedInventoryIndexRoute =
+  AuthenticatedInventoryIndexRouteImport.update({
+    id: '/inventory/',
+    path: '/inventory/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedInventoryLedgerRoute =
+  AuthenticatedInventoryLedgerRouteImport.update({
+    id: '/inventory/ledger',
+    path: '/inventory/ledger',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedInventoryReceiveRoute =
+  AuthenticatedInventoryReceiveRouteImport.update({
+    id: '/inventory/receive',
+    path: '/inventory/receive',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedRequisitionsIndexRoute =
+  AuthenticatedRequisitionsIndexRouteImport.update({
+    id: '/requisitions/',
+    path: '/requisitions/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedRequisitionsIdRoute =
+  AuthenticatedRequisitionsIdRouteImport.update({
+    id: '/requisitions/$id',
+    path: '/requisitions/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedRequisitionsNewRoute =
+  AuthenticatedRequisitionsNewRouteImport.update({
+    id: '/requisitions/new',
+    path: '/requisitions/new',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/products': typeof AuthenticatedProductsRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/inventory/ledger': typeof AuthenticatedInventoryLedgerRoute
+  '/inventory/receive': typeof AuthenticatedInventoryReceiveRoute
+  '/requisitions/$id': typeof AuthenticatedRequisitionsIdRoute
+  '/requisitions/new': typeof AuthenticatedRequisitionsNewRoute
+  '/inventory/': typeof AuthenticatedInventoryIndexRoute
+  '/requisitions/': typeof AuthenticatedRequisitionsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/products': typeof AuthenticatedProductsRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/inventory/ledger': typeof AuthenticatedInventoryLedgerRoute
+  '/inventory/receive': typeof AuthenticatedInventoryReceiveRoute
+  '/requisitions/$id': typeof AuthenticatedRequisitionsIdRoute
+  '/requisitions/new': typeof AuthenticatedRequisitionsNewRoute
+  '/inventory': typeof AuthenticatedInventoryIndexRoute
+  '/requisitions': typeof AuthenticatedRequisitionsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/products': typeof AuthenticatedProductsRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/inventory/ledger': typeof AuthenticatedInventoryLedgerRoute
+  '/_authenticated/inventory/receive': typeof AuthenticatedInventoryReceiveRoute
+  '/_authenticated/requisitions/$id': typeof AuthenticatedRequisitionsIdRoute
+  '/_authenticated/requisitions/new': typeof AuthenticatedRequisitionsNewRoute
+  '/_authenticated/inventory/': typeof AuthenticatedInventoryIndexRoute
+  '/_authenticated/requisitions/': typeof AuthenticatedRequisitionsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/reset-password'
+    | '/dashboard'
+    | '/products'
+    | '/settings'
+    | '/inventory/ledger'
+    | '/inventory/receive'
+    | '/requisitions/$id'
+    | '/requisitions/new'
+    | '/inventory/'
+    | '/requisitions/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/auth'
+    | '/reset-password'
+    | '/dashboard'
+    | '/products'
+    | '/settings'
+    | '/inventory/ledger'
+    | '/inventory/receive'
+    | '/requisitions/$id'
+    | '/requisitions/new'
+    | '/inventory'
+    | '/requisitions'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/reset-password'
+    | '/_authenticated/dashboard'
+    | '/_authenticated/products'
+    | '/_authenticated/settings'
+    | '/_authenticated/inventory/ledger'
+    | '/_authenticated/inventory/receive'
+    | '/_authenticated/requisitions/$id'
+    | '/_authenticated/requisitions/new'
+    | '/_authenticated/inventory/'
+    | '/_authenticated/requisitions/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRoute: typeof AuthRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +200,125 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/products': {
+      id: '/_authenticated/products'
+      path: '/products'
+      fullPath: '/products'
+      preLoaderRoute: typeof AuthenticatedProductsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/inventory/': {
+      id: '/_authenticated/inventory/'
+      path: '/inventory'
+      fullPath: '/inventory/'
+      preLoaderRoute: typeof AuthenticatedInventoryIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/inventory/ledger': {
+      id: '/_authenticated/inventory/ledger'
+      path: '/inventory/ledger'
+      fullPath: '/inventory/ledger'
+      preLoaderRoute: typeof AuthenticatedInventoryLedgerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/inventory/receive': {
+      id: '/_authenticated/inventory/receive'
+      path: '/inventory/receive'
+      fullPath: '/inventory/receive'
+      preLoaderRoute: typeof AuthenticatedInventoryReceiveRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/requisitions/': {
+      id: '/_authenticated/requisitions/'
+      path: '/requisitions'
+      fullPath: '/requisitions/'
+      preLoaderRoute: typeof AuthenticatedRequisitionsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/requisitions/$id': {
+      id: '/_authenticated/requisitions/$id'
+      path: '/requisitions/$id'
+      fullPath: '/requisitions/$id'
+      preLoaderRoute: typeof AuthenticatedRequisitionsIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/requisitions/new': {
+      id: '/_authenticated/requisitions/new'
+      path: '/requisitions/new'
+      fullPath: '/requisitions/new'
+      preLoaderRoute: typeof AuthenticatedRequisitionsNewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedProductsRoute: typeof AuthenticatedProductsRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedInventoryLedgerRoute: typeof AuthenticatedInventoryLedgerRoute
+  AuthenticatedInventoryReceiveRoute: typeof AuthenticatedInventoryReceiveRoute
+  AuthenticatedRequisitionsIdRoute: typeof AuthenticatedRequisitionsIdRoute
+  AuthenticatedRequisitionsNewRoute: typeof AuthenticatedRequisitionsNewRoute
+  AuthenticatedInventoryIndexRoute: typeof AuthenticatedInventoryIndexRoute
+  AuthenticatedRequisitionsIndexRoute: typeof AuthenticatedRequisitionsIndexRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedProductsRoute: AuthenticatedProductsRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedInventoryLedgerRoute: AuthenticatedInventoryLedgerRoute,
+  AuthenticatedInventoryReceiveRoute: AuthenticatedInventoryReceiveRoute,
+  AuthenticatedRequisitionsIdRoute: AuthenticatedRequisitionsIdRoute,
+  AuthenticatedRequisitionsNewRoute: AuthenticatedRequisitionsNewRoute,
+  AuthenticatedInventoryIndexRoute: AuthenticatedInventoryIndexRoute,
+  AuthenticatedRequisitionsIndexRoute: AuthenticatedRequisitionsIndexRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
