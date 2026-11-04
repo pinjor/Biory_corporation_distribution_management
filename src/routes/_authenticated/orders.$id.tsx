@@ -298,6 +298,13 @@ function DeliverDialog({ order, onClose, onDone }: { order: Order; onClose: () =
       return data;
     },
     onSuccess: () => {
+      // Count the order only when this delivery hands over everything that was still owed.
+      if (open.every((i) => qtyFor(i) === i.qty - i.delivered_qty)) {
+        window.__lovableEvents?.track?.("project.order_delivered", {
+          line_count: order.order_items.length,
+          had_partial_deliveries: order.order_items.some((i) => i.delivered_qty > 0),
+        });
+      }
       toast.success("Delivery confirmed — challan generated");
       onDone();
       onClose();

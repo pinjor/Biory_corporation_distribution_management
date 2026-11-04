@@ -150,6 +150,31 @@
           }
         }
       }
+    },
+    "project.order_delivered": {
+      "event_schema_version": 1,
+      "description": "An order became fully delivered: the delivery just confirmed handed over every remaining unit.",
+      "privacy": {
+        "contains_pii": false,
+        "purpose": "product_analytics"
+      },
+      "properties_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "line_count",
+          "had_partial_deliveries"
+        ],
+        "properties": {
+          "line_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "had_partial_deliveries": {
+            "type": "boolean"
+          }
+        }
+      }
     }
   }
 }
