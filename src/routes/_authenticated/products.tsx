@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Plus, Pencil } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
+import { api } from "@/lib/api/client";
+import type { Database } from "@/lib/database.types";
 import { PageHeader, Section, Money, StatusBadge, Field, EmptyState } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
@@ -165,8 +165,8 @@ function ProductDialog({ product, onClose }: { product: Partial<Product>; onClos
       };
       if (!payload.code || !payload.name) throw new Error("Code and name are required");
       const { error } = product.id
-        ? await supabase.from("products").update(payload).eq("id", product.id)
-        : await supabase.from("products").insert(payload);
+        ? await api.from("products").update(payload).eq("id", product.id)
+        : await api.from("products").insert(payload);
       if (error) throw error;
     },
     onSuccess: () => {

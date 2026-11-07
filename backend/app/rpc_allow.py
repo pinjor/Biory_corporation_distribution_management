@@ -1,0 +1,36 @@
+"""Functions the browser is allowed to call. Everything else stays internal."""
+
+RPC_ALLOW = frozenset(
+    {
+        "find_party_duplicates",
+        "receive_stock",
+        "import_opening_stock",
+        "adjust_stock",
+        "transfer_stock",
+        "submit_requisition",
+        "submit_requisition_for",
+        "decide_requisition",
+        "issue_requisition",
+        "receive_requisition",
+        "cancel_requisition",
+        "create_order",
+        "list_sales_officers",
+        "so_available_stock",
+        "central_available_stock",
+        "decide_order",
+        "cancel_order",
+        "reverse_collection",
+        "deliver_order",
+        "record_collection",
+        "set_user_role",
+        "admin_update_profile",
+        "my_available_stock",
+        "dashboard_summary",
+        "record_doctor_visit",
+        "review_deposit",
+        "submit_deposit",
+        "review_expense",
+        "cancel_expense",
+        "submit_expense",
+    }
+)

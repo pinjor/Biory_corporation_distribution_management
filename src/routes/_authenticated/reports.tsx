@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState, type ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { PageHeader, Section, EmptyState } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
@@ -19,15 +19,15 @@ export const Route = createFileRoute("/_authenticated/reports")({
 
 type ReportKey = "outstanding" | "so" | "product" | "collections" | "discounts" | "stock" | "expiry" | "promo";
 
-const REPORTS: { key: ReportKey; label: string; staffOnly?: boolean }[] = [
-  { key: "outstanding", label: "Outstanding & ageing" },
-  { key: "so", label: "SO performance", staffOnly: true },
-  { key: "product", label: "Product sales" },
-  { key: "collections", label: "Collections" },
-  { key: "discounts", label: "Discounts" },
-  { key: "stock", label: "Low stock (central)" },
-  { key: "expiry", label: "Near expiry / expired" },
-  { key: "promo", label: "Promotional usage" },
+const REPORTS: { key: ReportKey; label: string; money?: boolean; stock?: boolean }[] = [
+  { key: "outstanding", label: "Outstanding & ageing", money: true },
+  { key: "so", label: "SO performance", money: true },
+  { key: "product", label: "Product sales", money: true },
+  { key: "collections", label: "Collections", money: true },
+  { key: "discounts", label: "Discounts", money: true },
+  { key: "stock", label: "Low stock (central)", stock: true },
+  { key: "expiry", label: "Near expiry / expired", stock: true },
+  { key: "promo", label: "Promotional usage", stock: true },
 ];
 
 interface Col<T> {
@@ -84,8 +84,9 @@ function ReportsPage() {
   const month = rangeFor("month");
   const [from, setFrom] = useState(month.from);
   const [to, setTo] = useState(month.to);
-  const list = REPORTS.filter((r) => !r.staffOnly || s.isStaff);
-  const needsRange = ["so", "product", "collections", "discounts", "promo"].includes(report);
+  const list = REPORTS.filter((r) => (r.money ? s.isFinance || s.isSO : true) && (r.stock ? s.isWarehouse || s.isSO : true));
+  const shown = list.some((r) => r.key === report) ? report : (list[0]?.key ?? "outstanding");
+  const needsRange = ["so", "product", "collections", "discounts", "promo"].includes(shown);
   return (
     <div>
       <PageHeader
@@ -93,7 +94,7 @@ function ReportsPage() {
         description={s.isStaff ? "Company-wide figures, reconciled to the stock and money ledgers." : "Your own figures."}
         actions={
           <>
-            <NativeSelect value={report} onChange={(e) => setReport(e.target.value as ReportKey)} className="w-52">
+            <NativeSelect value={shown} onChange={(e) => setReport(e.target.value as ReportKey)} className="w-52">
               {list.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
             </NativeSelect>
             {needsRange && (
@@ -105,14 +106,14 @@ function ReportsPage() {
           </>
         }
       />
-      {report === "outstanding" && <Outstanding />}
-      {report === "so" && <SoPerformance from={from} to={to} />}
-      {report === "product" && <ProductSales from={from} to={to} />}
-      {report === "collections" && <Collections from={from} to={to} />}
-      {report === "discounts" && <Discounts from={from} to={to} />}
-      {report === "stock" && <LowStock />}
-      {report === "expiry" && <Expiry />}
-      {report === "promo" && <Promo from={from} to={to} />}
+      {shown === "outstanding" && <Outstanding />}
+      {shown === "so" && <SoPerformance from={from} to={to} />}
+      {shown === "product" && <ProductSales from={from} to={to} />}
+      {shown === "collections" && <Collections from={from} to={to} />}
+      {shown === "discounts" && <Discounts from={from} to={to} />}
+      {shown === "stock" && <LowStock />}
+      {shown === "expiry" && <Expiry />}
+      {shown === "promo" && <Promo from={from} to={to} />}
     </div>
   );
 }
@@ -121,7 +122,7 @@ function Outstanding() {
   const { data = [] } = useQuery({
     queryKey: ["rpt-outstanding"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("orders")
         .select("chemist_id, due, first_delivered_at, chemists(business_name, code, payment_terms_days, credit_limit), profiles!orders_so_id_fkey(full_name)")
         .gt("due", 0)
@@ -171,7 +172,7 @@ function SoPerformance({ from, to }: { from: string; to: string }) {
   const { data } = useQuery({
     queryKey: ["rpt-so", from, to],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("dashboard_summary", { p_from: from, p_to: to });
+      const { data, error } = await api.rpc("dashboard_summary", { p_from: from, p_to: to });
       if (error) throw error;
       return (data as unknown as { top_sos: { full_name: string; so_code: string; order_value: number; delivered: number; collected: number; visits: number; new_chemists: number }[] }).top_sos;
     },
@@ -198,7 +199,7 @@ function ProductSales({ from, to }: { from: string; to: string }) {
   const { data = [] } = useQuery({
     queryKey: ["rpt-product", from, to],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("order_items")
         .select("product_id, qty, delivered_qty, line_mrp, line_trp, line_net, net_unit_price, products(name, code), orders!inner(order_date, status)")
         .gte("orders.order_date", from)
@@ -244,7 +245,7 @@ function Collections({ from, to }: { from: string; to: string }) {
   const { data = [] } = useQuery({
     queryKey: ["rpt-collections", from, to],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("collections")
         .select("*, chemists(business_name), orders(order_no), profiles!collections_so_id_fkey(full_name)")
         .gte("collection_date", from)
@@ -279,7 +280,7 @@ function Discounts({ from, to }: { from: string; to: string }) {
   const { data = [] } = useQuery({
     queryKey: ["rpt-discounts", from, to],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("orders")
         .select("*, chemists(business_name), profiles!orders_so_id_fkey(full_name)")
         .gte("order_date", from)
@@ -316,7 +317,7 @@ function LowStock() {
   const { data: stock = [] } = useQuery({
     queryKey: ["rpt-central-stock"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("v_stock").select("product_id, qty, days_to_expiry, location_kind").eq("location_kind", "central");
+      const { data, error } = await api.from("v_stock").select("product_id, qty, days_to_expiry, location_kind").eq("location_kind", "central");
       if (error) throw error;
       return data;
     },
@@ -351,7 +352,7 @@ function Expiry() {
   const { data = [] } = useQuery({
     queryKey: ["rpt-expiry", near],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("v_stock")
         .select("*")
         .gt("qty", 0)
@@ -382,7 +383,7 @@ function Promo({ from, to }: { from: string; to: string }) {
   const { data = [] } = useQuery({
     queryKey: ["rpt-promo", from, to],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("visit_items")
         .select("qty, product_id, products(name), doctor_visits!inner(visit_date, doctor_id, doctors(name), profiles!doctor_visits_so_id_fkey(full_name))")
         .gte("doctor_visits.visit_date", from)

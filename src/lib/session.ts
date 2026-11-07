@@ -1,5 +1,5 @@
 import { getRouteApi } from "@tanstack/react-router";
-import type { Database } from "@/integrations/supabase/types";
+import type { Database } from "@/lib/database.types";
 
 export type AppRole = Database["public"]["Enums"]["app_role"];
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];

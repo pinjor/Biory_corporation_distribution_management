@@ -2,8 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
+import { api } from "@/lib/api/client";
+import type { Database } from "@/lib/database.types";
 import { PageHeader, Section, Field, PageLoader, Money } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ function SettingsPage() {
     mutationFn: async () => {
       if (!f) return;
       const { id: _id, updated_at: _u, ...rest } = f;
-      const { error } = await supabase
+      const { error } = await api
         .from("app_settings")
         .update({ ...rest, updated_at: new Date().toISOString() })
         .eq("id", 1);

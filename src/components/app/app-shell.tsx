@@ -4,7 +4,6 @@ import {
   BarChart3,
   Bell,
   Boxes,
-  ClipboardList,
   FileClock,
   HandCoins,
   LayoutDashboard,
@@ -25,7 +24,7 @@ import {
   Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import {
   Sidebar,
   SidebarContent,
@@ -52,7 +51,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ROLE_LABELS, useSession, type AppRole } from "@/lib/session";
+import { rolesForPath } from "@/lib/access";
+import { ROLE_LABELS, useSession } from "@/lib/session";
 import { formatDateTime } from "@/lib/format";
 import { OfflineProvider, useOffline } from "@/components/app/offline-provider";
 import { SyncStatusChip } from "@/components/app/sync-status";
@@ -62,7 +62,6 @@ interface NavItem {
   to: NonNullable<LinkProps["to"]>;
   label: string;
   icon: LucideIcon;
-  roles?: AppRole[]; // undefined = everyone with any role
 }
 
 const NAV: { group: string; items: NavItem[] }[] = [
@@ -70,12 +69,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: "Sales",
     items: [
-      {
-        to: "/orders",
-        label: "Orders",
-        icon: ShoppingCart,
-        roles: ["super_admin", "admin", "finance_admin", "warehouse_admin", "sales_officer"],
-      },
+      { to: "/orders", label: "Orders", icon: ShoppingCart },
       { to: "/chemists", label: "Chemists", icon: Store },
       { to: "/doctors", label: "Doctors", icon: UserRound },
       { to: "/visits", label: "Doctor visits", icon: Stethoscope },
@@ -85,48 +79,17 @@ const NAV: { group: string; items: NavItem[] }[] = [
     group: "Inventory",
     items: [
       { to: "/inventory", label: "Stock", icon: Boxes },
-      {
-        to: "/requisitions",
-        label: "Requisitions",
-        icon: ClipboardList,
-        roles: ["super_admin", "admin", "warehouse_admin", "sales_officer"],
-      },
-      {
-        to: "/inventory/receive",
-        label: "Receive stock",
-        icon: PackagePlus,
-        roles: ["super_admin", "admin", "warehouse_admin"],
-      },
-      {
-        to: "/inventory/opening",
-        label: "Opening stock",
-        icon: PackageOpen,
-        roles: ["super_admin", "admin", "warehouse_admin"],
-      },
-      {
-        to: "/inventory/adjust",
-        label: "Stock adjustment",
-        icon: SlidersHorizontal,
-        roles: ["super_admin", "admin", "warehouse_admin"],
-      },
+      { to: "/inventory/receive", label: "Receive stock", icon: PackagePlus },
+      { to: "/inventory/opening", label: "Opening stock", icon: PackageOpen },
+      { to: "/inventory/adjust", label: "Stock adjustment", icon: SlidersHorizontal },
       { to: "/products", label: "Products", icon: Pill },
     ],
   },
   {
     group: "Money",
     items: [
-      {
-        to: "/wallet",
-        label: "Wallet",
-        icon: Wallet,
-        roles: ["super_admin", "admin", "finance_admin", "sales_officer"],
-      },
-      {
-        to: "/deposits",
-        label: "Deposits",
-        icon: HandCoins,
-        roles: ["super_admin", "admin", "finance_admin", "sales_officer"],
-      },
+      { to: "/wallet", label: "Wallet", icon: Wallet },
+      { to: "/deposits", label: "Deposits", icon: HandCoins },
       { to: "/expenses", label: "Expenses", icon: Receipt },
     ],
   },
@@ -137,14 +100,9 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: "Administration",
     items: [
-      { to: "/users", label: "Users & roles", icon: Users, roles: ["super_admin", "admin"] },
-      {
-        to: "/settings",
-        label: "Pricing & policy",
-        icon: Settings,
-        roles: ["super_admin", "admin"],
-      },
-      { to: "/audit", label: "Audit log", icon: FileClock, roles: ["super_admin", "admin"] },
+      { to: "/users", label: "Users & roles", icon: Users },
+      { to: "/settings", label: "Pricing & policy", icon: Settings },
+      { to: "/audit", label: "Audit log", icon: FileClock },
     ],
   },
 ];
@@ -201,7 +159,7 @@ function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         {NAV.map((g) => {
-          const items = g.items.filter((i) => !i.roles || session.has(...i.roles));
+          const items = g.items.filter((i) => session.has(...rolesForPath(i.to)));
           if (!items.length) return null;
           return (
             <SidebarGroup key={g.group}>
@@ -246,7 +204,7 @@ function NotificationsBell() {
   const { data = [] } = useQuery({
     queryKey: ["notifications", session.userId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("notifications")
         .select("*")
         .order("created_at", { ascending: false })
@@ -259,7 +217,7 @@ function NotificationsBell() {
   const unread = data.filter((n) => !n.read_at).length;
   const markAll = useMutation({
     mutationFn: async () => {
-      await supabase
+      await api
         .from("notifications")
         .update({ read_at: new Date().toISOString() })
         .is("read_at", null);
@@ -300,7 +258,7 @@ function NotificationsBell() {
               className="flex w-full flex-col items-start gap-0.5 border-b px-3 py-2 text-left last:border-0 hover:bg-muted"
               onClick={async () => {
                 if (!n.read_at) {
-                  await supabase
+                  await api
                     .from("notifications")
                     .update({ read_at: new Date().toISOString() })
                     .eq("id", n.id);
@@ -344,7 +302,7 @@ function UserMenu() {
     await qc.cancelQueries();
     qc.clear();
     clearOfflineCaches();
-    await supabase.auth.signOut();
+    await api.auth.signOut();
     navigate({ to: "/auth", replace: true });
   }
   const name = session.profile?.full_name || session.email;
@@ -395,7 +353,7 @@ function AwaitingAccess() {
             onClick={async () => {
               qc.clear();
               clearOfflineCaches();
-              await supabase.auth.signOut();
+              await api.auth.signOut();
               navigate({ to: "/auth", replace: true });
             }}
           >

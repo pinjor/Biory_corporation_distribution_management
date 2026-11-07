@@ -1,23 +1,12 @@
 /// <reference types="vite-plugin-pwa/client" />
 /**
  * The only place the offline service worker is registered.
- * Never in dev, inside an iframe, or on Lovable preview hosts; `?sw=off` removes it.
+ * Never in dev or inside an iframe; `?sw=off` removes it.
  */
 
 const SW_PATH = "/sw.js";
-const PROJECT_ID = "1a5a7adf-3a9e-4e46-a412-287063b7472e";
-const LOVABLE_DOMAINS = [".lovable.app", ".gpt-eng.com", ".gptengineer.run"];
 
-export function isPreviewHost(hostname: string): boolean {
-  const h = hostname.toLowerCase();
-  const first = h.split(".")[0] ?? "";
-  if (LOVABLE_DOMAINS.some((d) => h.endsWith(d))) {
-    if (/^(?:id-preview|preview)(?:-[a-z0-9]+)?--.+$/.test(first)) return true;
-    if (first === `project--${PROJECT_ID}-dev`) return true;
-  }
-  if (h === "lovableproject.com" || h.endsWith(".lovableproject.com")) return true;
-  if (h === "lovableproject-dev.com" || h.endsWith(".lovableproject-dev.com")) return true;
-  if (h === "beta.lovable.dev" || h.endsWith(".beta.lovable.dev")) return true;
+export function isPreviewHost(_hostname: string): boolean {
   return false;
 }
 

@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Plus } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { PageHeader, Section, EmptyState } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,7 @@ function VisitsPage() {
   const { data = [], isLoading } = useQuery({
     queryKey: ["visits", from, to, so],
     queryFn: async () => {
-      let q = supabase
+      let q = api
         .from("doctor_visits")
         .select("*, doctors(name, speciality, chamber), profiles!doctor_visits_so_id_fkey(full_name), visit_items(qty, products(name))")
         .gte("visit_date", from)

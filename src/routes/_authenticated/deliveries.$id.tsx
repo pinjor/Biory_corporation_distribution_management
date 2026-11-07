@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Printer } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { PageHeader, PageLoader, Money, Qty } from "@/components/app/page";
 import { Button } from "@/components/ui/button";
 import { settingsQuery } from "@/lib/queries";
@@ -18,7 +18,7 @@ function Challan() {
   const { data: d, isLoading } = useQuery({
     queryKey: ["delivery", id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("deliveries")
         .select("*, orders(order_no, order_date), chemists(*), profiles!deliveries_so_id_fkey(full_name, so_code, phone), delivery_items(*, products(name, code, pack_size), batches(batch_no, expiry_date))")
         .eq("id", id)

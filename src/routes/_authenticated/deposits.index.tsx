@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Paperclip } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { PageHeader, Section, StatusBadge, EmptyState, Money } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ function DepositsPage() {
   const { data = [], isLoading } = useQuery({
     queryKey: ["deposits", status],
     queryFn: async () => {
-      let q = supabase.from("deposits").select("*, profiles!deposits_so_id_fkey(full_name, so_code)").order("created_at", { ascending: false }).limit(300);
+      let q = api.from("deposits").select("*, profiles!deposits_so_id_fkey(full_name, so_code)").order("created_at", { ascending: false }).limit(300);
       if (status) q = q.eq("status", status);
       const { data, error } = await q;
       if (error) throw error;

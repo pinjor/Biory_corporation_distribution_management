@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { CheckCircle2, ExternalLink, Printer } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { PageHeader, Section, StatusBadge, KeyValue, PageLoader, Money } from "@/components/app/page";
 import { ReasonDialog } from "@/components/app/reason-dialog";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ function DepositDetail() {
   const { data: d, isLoading } = useQuery({
     queryKey: ["deposit", id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("deposits").select("*, profiles!deposits_so_id_fkey(full_name, so_code)").eq("id", id).single();
+      const { data, error } = await api.from("deposits").select("*, profiles!deposits_so_id_fkey(full_name, so_code)").eq("id", id).single();
       if (error) throw error;
       return data;
     },
@@ -39,7 +39,7 @@ function DepositDetail() {
   };
   const approve = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("review_deposit", { p_id: id, p_approve: true, p_reason: "" });
+      const { error } = await api.rpc("review_deposit", { p_id: id, p_approve: true, p_reason: "" });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Deposit approved — receipt issued"); refresh(); },
@@ -47,7 +47,7 @@ function DepositDetail() {
   });
   async function openProof() {
     if (!d?.attachment_path) return;
-    const { data, error } = await supabase.storage.from("deposit-proofs").createSignedUrl(d.attachment_path, 300);
+    const { data, error } = await api.storage.from("deposit-proofs").createSignedUrl(d.attachment_path, 300);
     if (error) return void toast.error(errorMessage(error));
     window.open(data.signedUrl, "_blank", "noopener");
   }
@@ -137,7 +137,7 @@ function DepositDetail() {
           note="The amount goes back to the SO's wallet as a reversal entry."
           onClose={() => setReject(false)}
           run={async (reason) => {
-            const { error } = await supabase.rpc("review_deposit", { p_id: id, p_approve: false, p_reason: reason });
+            const { error } = await api.rpc("review_deposit", { p_id: id, p_approve: false, p_reason: reason });
             if (error) throw error;
             refresh();
           }}

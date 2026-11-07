@@ -1,15 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CloudOff, Minus, Plus, Save } from "lucide-react";
+import { CloudOff, Minus, Plus, Save } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { PageHeader, Section, Money, Qty, Field, EmptyState } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { myAvailableStockQuery, myChemistsQuery, opt, productsQuery, settingsQuery } from "@/lib/queries";
+import { myAvailableStockQuery, opt, productsQuery, salesOfficersQuery, settingsQuery } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { checkDiscounts, computeOrderTotals } from "@/lib/pricing";
 import { errorMessage } from "@/lib/format";
@@ -18,8 +18,10 @@ import { classifyRpcError, queuedQtyByProduct } from "@/lib/offline/outbox";
 import { ORDER_DRAFT_KEY as DRAFT_KEY, type OrderDraft as Draft } from "@/lib/offline/order-draft";
 
 export const Route = createFileRoute("/_authenticated/orders/new")({
-  validateSearch: (s: Record<string, unknown>): { chemist?: string } =>
-    typeof s["chemist"] === "string" ? { chemist: s["chemist"] } : {},
+  validateSearch: (s: Record<string, unknown>): { chemist?: string; so?: string } => ({
+    ...(typeof s["chemist"] === "string" ? { chemist: s["chemist"] } : {}),
+    ...(typeof s["so"] === "string" ? { so: s["so"] } : {}),
+  }),
   head: () => ({ meta: [{ title: "New order — BIORY Corporation" }] }),
   component: NewOrder,
 });
@@ -29,13 +31,40 @@ function NewOrder() {
   const search = Route.useSearch();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const canBook = s.isSO || s.isSuper;
   const { data: settings } = useQuery(settingsQuery);
   const { data: products = [] } = useQuery(productsQuery);
-  const { data: stock = [] } = useQuery(myAvailableStockQuery);
-  const { data: chemists = [], isPending: chemistsPending } = useQuery(myChemistsQuery(s.userId));
+  const { data: officers = [] } = useQuery({ ...salesOfficersQuery, enabled: s.isSuper });
   const offline = useOffline();
 
+  const [soFilter, setSoFilter] = useState(search.so ?? "");
+  const { data: allChemists = [], isPending: chemistsPending, isError: chemistsError } = useQuery({
+    queryKey: ["chemists", "order-form", s.isSuper ? "all" : s.userId],
+    enabled: canBook,
+    queryFn: async () => {
+      let q = api.from("chemists").select("*").eq("status", "active").order("business_name");
+      if (!s.isSuper) q = q.eq("assigned_so", s.userId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
   const [chemist, setChemist] = useState(search.chemist ?? "");
+  const chemists = soFilter ? allChemists.filter((c) => c.assigned_so === soFilter) : allChemists;
+  const selectedChemist = allChemists.find((c) => c.id === chemist);
+  const bookingSo = s.isSuper ? (selectedChemist?.assigned_so ?? "") : s.userId;
+  const { data: stock = [] } = useQuery({
+    ...myAvailableStockQuery,
+    queryKey: ["my-available-stock", s.isSuper ? "central" : bookingSo || "none"],
+    enabled: canBook && (s.isSuper || !!bookingSo),
+    queryFn: async () => {
+      const call = s.isSuper ? api.rpc("central_available_stock") : api.rpc("my_available_stock");
+      const { data, error } = await call;
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+
   const [qty, setQty] = useState<Record<string, number>>({});
   const [soPct, setSoPct] = useState("0");
   const [extraPct, setExtraPct] = useState("0");
@@ -86,7 +115,6 @@ function NewOrder() {
   const policy = settings ?? { so_discount_max_pct: 5, extra_discount_max_pct: 20, extra_discount_so_limit_pct: 5 };
   const disc = checkDiscounts(so, extra, policy);
   const overStock = lines.filter((l) => l.qty > (availMap.get(l.product.id) ?? 0));
-  const selectedChemist = chemists.find((c) => c.id === chemist);
 
   const queueOffline = (why: "offline" | "dropped") => {
     offline.queueOrder({
@@ -100,7 +128,6 @@ function NewOrder() {
       netEstimate: totals.net,
     });
     localStorage.removeItem(DRAFT_KEY);
-    window.__lovableEvents?.track?.("project.offline_order_queued", { reason: why, line_count: lines.length });
     toast.success(why === "offline" ? "Saved on this device — it will sync automatically when you're back online" : "Connection dropped — order saved on this device and will sync automatically");
     navigate({ to: "/orders" });
   };
@@ -109,14 +136,18 @@ function NewOrder() {
     // Run even when offline — the handler itself decides to queue the order on the device.
     networkMode: "always",
     mutationFn: async () => {
-      if (!navigator.onLine) return { queued: true as const };
-      const { data, error, status } = await supabase.rpc("create_order", {
+      if (!navigator.onLine) {
+        if (s.isSuper) throw new Error("A connection is required when a Super Admin books an order");
+        return { queued: true as const };
+      }
+      const { data, error, status } = await api.rpc("create_order", {
         p_chemist: chemist,
         p_items: lines.map((l) => ({ product_id: l.product.id, qty: l.qty })),
         p_so_discount_pct: so,
         p_extra_discount_pct: extra,
         p_remarks: opt(remarks),
         p_idempotency_key: idemKey,
+        ...(s.isSuper ? { p_so: bookingSo } : {}),
       });
       if (error) {
         // No definitive answer from the server: keep it on the device (same idempotency key, so no duplicate).
@@ -131,7 +162,7 @@ function NewOrder() {
       localStorage.removeItem(DRAFT_KEY);
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["my-available-stock"] });
-      toast.success("Order saved");
+      toast.success("Order confirmed");
       navigate({ to: "/orders/$id", params: { id } });
     },
     onError: (e) => {
@@ -140,14 +171,21 @@ function NewOrder() {
     },
   });
 
-  if (!s.isSO) return <PageHeader title="New order" description="Only Sales Officers can book orders." />;
+  if (!canBook) return <PageHeader title="New order" description="Only a Sales Officer or Super Admin can book orders." />;
 
   const setLine = (id: string, v: number) => setQty((x) => ({ ...x, [id]: Math.max(0, Math.floor(v)) }));
 
   return (
     <div className="pb-6">
-      <PageHeader title="New order" description="Prices come from the product master and are locked into the order when you save." />
-      {!offline.online && (
+      <PageHeader
+        title="New order"
+        description={
+          s.isSuper
+            ? "Pick the chemist shop. The order uses company stock and is confirmed immediately."
+            : "Prices come from the product master and are locked into the order when you save. The order is confirmed immediately."
+        }
+      />
+      {!offline.online && !s.isSuper && (
         <div className="mb-4 flex items-start gap-2 rounded-xl bg-warning-soft px-4 py-3 text-sm text-warning-foreground">
           <CloudOff className="mt-0.5 size-4 shrink-0" />
           <span>
@@ -158,23 +196,49 @@ function NewOrder() {
       )}
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <div className="flex flex-col gap-6">
-          <Section title="Chemist">
-            {chemists.length === 0 && !offline.online && chemistsPending ? (
+          <Section title="Chemist shop">
+            {s.isSuper && (
+              <Field label="Narrow the list">
+                <NativeSelect
+                  value={soFilter}
+                  onChange={(e) => {
+                    setSoFilter(e.target.value);
+                    setChemist("");
+                  }}
+                  className="mb-3"
+                >
+                  <option value="">All chemist shops</option>
+                  {officers.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.full_name} {o.so_code ? `· ${o.so_code}` : ""}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </Field>
+            )}
+            {chemistsPending ? (
+              <p className="text-sm text-muted-foreground">Loading chemist shops…</p>
+            ) : chemistsError ? (
+              <EmptyState title="Chemist shops could not be loaded" description="Refresh the page and try again." />
+            ) : chemists.length === 0 && !offline.online ? (
               <EmptyState title="Your chemist list isn't on this device yet" description="Connect to the internet once so the app can download your chemists and products." />
             ) : chemists.length === 0 ? (
               <EmptyState
-                title="No chemists assigned to you"
+                title="No chemist shops to choose"
                 action={<Button asChild size="sm"><Link to="/chemists">Add a chemist</Link></Button>}
               />
             ) : (
               <NativeSelect value={chemist} onChange={(e) => setChemist(e.target.value)}>
-                <option value="">Choose chemist…</option>
+                <option value="">Choose chemist shop…</option>
                 {chemists.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.business_name} · {c.upazila ?? c.district ?? c.code}
                   </option>
                 ))}
               </NativeSelect>
+            )}
+            {selectedChemist && !selectedChemist.assigned_so && (
+              <p className="mt-2 text-xs text-destructive">Assign a Sales Officer to this chemist shop before booking.</p>
             )}
             {selectedChemist && Number(selectedChemist.credit_limit) > 0 && (
               <p className="mt-2 text-xs text-muted-foreground">
@@ -254,25 +318,19 @@ function NewOrder() {
             {disc.errors.map((e) => (
               <p key={e} className="mt-3 rounded-md bg-destructive-soft px-3 py-2 text-xs text-destructive">{e}</p>
             ))}
-            {disc.needsApproval && disc.errors.length === 0 && (
-              <p className="mt-3 flex items-start gap-2 rounded-md bg-warning-soft px-3 py-2 text-xs text-warning-foreground">
-                <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-                Extra discount above your {policy.extra_discount_so_limit_pct}% authority — the order will wait for Admin approval before delivery.
-              </p>
-            )}
             <Field label="Remarks">
               <Textarea className="mt-3" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
             </Field>
             <Button
               className="mt-4 w-full"
               size="lg"
-              disabled={!chemist || lines.length === 0 || disc.errors.length > 0 || overStock.length > 0 || save.isPending}
+              disabled={!chemist || !bookingSo || lines.length === 0 || disc.errors.length > 0 || overStock.length > 0 || save.isPending}
               onClick={() => save.mutate()}
             >
-              {offline.online ? <Save /> : <CloudOff />} {save.isPending ? "Saving…" : offline.online ? "Save order" : "Save offline"}
+              {s.isSuper || offline.online ? <Save /> : <CloudOff />} {save.isPending ? "Saving…" : s.isSuper || offline.online ? "Save order" : "Save offline"}
             </Button>
             <p className="mt-2 text-center text-xs text-muted-foreground">
-              {offline.online ? "Draft is kept on this device until saved." : "Will sync automatically when you're back online."}
+              {s.isSuper || offline.online ? "The order is confirmed as soon as you save it." : "Will sync automatically when you're back online."}
             </p>
           </Section>
         </div>

@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Boxes, HandCoins, PackageCheck, Stethoscope, Truck, Warehouse } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BrandMark } from "@/components/app/brand-mark";
 import heroImg from "@/assets/field-hero.jpg";
-import logo from "@/assets/biory-logo.png.asset.json";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -39,8 +39,8 @@ function Landing() {
     <div className="min-h-screen bg-background">
       <header className="bg-hero text-sidebar-foreground">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
-          <span className="inline-flex rounded-lg bg-card px-3 py-1.5 shadow-card">
-            <img src={logo.url} alt="BIORY Corporation" className="h-11 w-auto" />
+          <span className="inline-flex rounded-2xl bg-card px-3 py-2 shadow-card">
+            <BrandMark />
           </span>
           <Button asChild variant="highlight" size="sm">
             <Link to="/auth">Sign in</Link>
@@ -112,7 +112,17 @@ function Landing() {
           ))}
         </ol>
       </main>
-      <footer className="border-t py-8 text-center text-xs text-muted-foreground">BIORY Corporation · Asia/Dhaka</footer>
+      <footer className="border-t py-8 text-center text-xs text-muted-foreground">
+        <div>BIORY Corporation · Asia/Dhaka</div>
+        <a
+          href="https://xactpulse.com/review/index.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 inline-flex items-center gap-1 transition-colors hover:text-foreground"
+        >
+          Powered by <span className="font-semibold tracking-wide text-foreground">XactPulse</span>
+        </a>
+      </footer>
     </div>
   );
 }

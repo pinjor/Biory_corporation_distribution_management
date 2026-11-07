@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { PageHeader, Section, Field, Qty } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { RecentMovements } from "@/components/app/stock-forms";
@@ -47,7 +47,7 @@ function AdjustPage() {
     queryKey: ["stock", location, "adjust"],
     enabled: !!location,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("v_stock")
         .select("*")
         .eq("location_id", location)
@@ -68,7 +68,7 @@ function AdjustPage() {
 
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("adjust_stock", {
+      const { error } = await api.rpc("adjust_stock", {
         p_location: location,
         p_batch: batch,
         p_qty: n,

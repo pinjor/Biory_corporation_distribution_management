@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Camera, HandCoins } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { PageHeader, Section, StatCard, Money, EmptyState, Field } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,7 @@ function WalletPage() {
   const { data: summaries = [] } = useQuery({
     queryKey: ["wallet-summary"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("v_wallet_summary").select("*").order("full_name");
+      const { data, error } = await api.from("v_wallet_summary").select("*").order("full_name");
       if (error) throw error;
       return data;
     },
@@ -37,7 +37,7 @@ function WalletPage() {
   const { data: ledger = [] } = useQuery({
     queryKey: ["wallet-ledger", viewing],
     queryFn: async () => {
-      let q = supabase.from("wallet_ledger").select("*, profiles!wallet_ledger_so_id_fkey(full_name)").order("created_at", { ascending: false }).limit(300);
+      let q = api.from("wallet_ledger").select("*, profiles!wallet_ledger_so_id_fkey(full_name)").order("created_at", { ascending: false }).limit(300);
       if (viewing) q = q.eq("so_id", viewing);
       const { data, error } = await q;
       if (error) throw error;
@@ -194,10 +194,10 @@ function DepositDialog({ balance, onClose }: { balance: number; onClose: () => v
         if (!ext) throw new Error("Proof must be a JPG, PNG, WEBP image or a PDF");
         if (file.size > MAX_BYTES) throw new Error("Proof must be 5 MB or smaller");
         path = `${s.userId}/${crypto.randomUUID()}.${ext}`;
-        const { error: upErr } = await supabase.storage.from("deposit-proofs").upload(path, file, { contentType: file.type, upsert: false });
+        const { error: upErr } = await api.storage.from("deposit-proofs").upload(path, file, { contentType: file.type, upsert: false });
         if (upErr) throw upErr;
       }
-      const { data, error } = await supabase.rpc("submit_deposit", {
+      const { data, error } = await api.rpc("submit_deposit", {
         p_amount: amt,
         p_method: f.method,
         p_provider: opt(f.provider),

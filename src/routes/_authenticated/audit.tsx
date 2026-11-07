@@ -1,14 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { PageHeader, Section, EmptyState } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { profilesQuery } from "@/lib/queries";
 import { formatDateTime, humanize } from "@/lib/format";
-import type { Json } from "@/integrations/supabase/types";
+import type { Json } from "@/lib/database.types";
 
 export const Route = createFileRoute("/_authenticated/audit")({
   head: () => ({ meta: [{ title: "Audit log — BIORY Corporation" }] }),
@@ -35,7 +35,7 @@ function AuditPage() {
   const { data = [], isLoading } = useQuery({
     queryKey: ["audit", entity, limit],
     queryFn: async () => {
-      let q = supabase.from("audit_log").select("*").order("created_at", { ascending: false }).limit(limit);
+      let q = api.from("audit_log").select("*").order("created_at", { ascending: false }).limit(limit);
       if (entity) q = q.eq("entity", entity);
       const { data, error } = await q;
       if (error) throw error;

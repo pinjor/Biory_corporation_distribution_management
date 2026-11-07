@@ -12,7 +12,7 @@ import {
   Truck,
   Wallet,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { PageHeader, Section, StatCard, PageLoader, EmptyState } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
@@ -66,7 +66,7 @@ function useSummary(from: string, to: string, so: string | null) {
   return useQuery({
     queryKey: ["dashboard", from, to, so],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("dashboard_summary", so ? { p_from: from, p_to: to, p_so: so } : { p_from: from, p_to: to });
+      const { data, error } = await api.rpc("dashboard_summary", so ? { p_from: from, p_to: to, p_so: so } : { p_from: from, p_to: to });
       if (error) throw error;
       return data as unknown as Summary;
     },
@@ -103,6 +103,13 @@ function AdminDashboard() {
                 <Input type="date" className="w-38" value={custom.to} max={todayBD()} onChange={(e) => setCustom({ ...custom, to: e.target.value })} />
               </>
             )}
+            {s.isSuper && (
+              <Button asChild>
+                <Link to="/orders/new">
+                  <ShoppingCart /> New order
+                </Link>
+              </Button>
+            )}
             <NativeSelect value={so} onChange={(e) => setSo(e.target.value)} className="w-44">
               <option value="">All Sales Officers</option>
               {(sos.data ?? []).map((p) => (
@@ -121,25 +128,28 @@ function AdminDashboard() {
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
             <StatCard label="Orders" value={formatInt(data.orders_count)} hint={formatBDTCompact(data.order_value)} icon={<ShoppingCart />} />
             <StatCard label="Delivered" value={formatBDTCompact(data.delivered_value)} icon={<Truck />} tone="info" />
-            <StatCard label="Collected" value={formatBDTCompact(data.collected_value)} icon={<HandCoins />} tone="success" />
-            <StatCard
-              label="Outstanding due"
-              value={formatBDTCompact(data.outstanding_due)}
-              hint={data.overdue_due > 0 ? `${formatBDT(data.overdue_due)} overdue` : "Nothing overdue"}
-              icon={<AlertTriangle />}
-              tone={data.overdue_due > 0 ? "destructive" : "default"}
-            />
-            <StatCard label="SO wallets" value={formatBDTCompact(data.wallet_balance)} hint="Cash held by SOs" icon={<Wallet />} tone="warning" />
-            <StatCard label="Doctor visits" value={formatInt(data.visits_count)} hint={`${data.new_chemists} new chemists`} icon={<Stethoscope />} />
+            {s.isFinance && <StatCard label="Collected" value={formatBDTCompact(data.collected_value)} icon={<HandCoins />} tone="success" />}
+            {s.isFinance && (
+              <StatCard
+                label="Outstanding due"
+                value={formatBDTCompact(data.outstanding_due)}
+                hint={data.overdue_due > 0 ? `${formatBDT(data.overdue_due)} overdue` : "Nothing overdue"}
+                icon={<AlertTriangle />}
+                tone={data.overdue_due > 0 ? "destructive" : "default"}
+              />
+            )}
+            {s.isFinance && <StatCard label="SO wallets" value={formatBDTCompact(data.wallet_balance)} hint="Cash held by SOs" icon={<Wallet />} tone="warning" />}
+            {s.isAdmin && <StatCard label="Doctor visits" value={formatInt(data.visits_count)} hint={`${data.new_chemists} new chemists`} icon={<Stethoscope />} />}
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+            {(s.isAdmin || s.isFinance) && (
             <Section title="Sales Officer performance" bodyClassName="p-0">
               {data.top_sos.length === 0 ? (
                 <div className="p-5">
                   <EmptyState
                     title="No Sales Officers yet"
-                    description="Assign the Sales Officer role to users to see their performance here."
+                    description="Add a Sales Officer from Users & roles. Their orders and visits show up here."
                     action={
                       s.isSuper ? (
                         <Button asChild size="sm">
@@ -181,16 +191,18 @@ function AdminDashboard() {
                 </Table>
               )}
             </Section>
+            )}
 
             <div className="flex flex-col gap-6">
               <Section title="Pending approvals">
                 <ul className="flex flex-col gap-2 text-sm">
-                  <AlertRow to="/orders" label="Orders awaiting discount / credit approval" count={data.pending_order_approvals} />
-                  <AlertRow to="/deposits" label={`Deposits to verify (${formatBDT(data.pending_deposits_value)})`} count={data.pending_deposits_count} />
-                  <AlertRow to="/requisitions" label="Requisitions to decide" count={data.pending_requisitions} />
-                  <AlertRow to="/requisitions" label="Approved requisitions to issue" count={data.awaiting_issue} />
+                  {s.isAdmin && <AlertRow to="/orders" label="Orders awaiting discount / credit approval" count={data.pending_order_approvals} />}
+                  {s.isFinance && <AlertRow to="/deposits" label={`Deposits to verify (${formatBDT(data.pending_deposits_value)})`} count={data.pending_deposits_count} />}
+                  {s.isWarehouse && <AlertRow to="/requisitions" label="Requisitions to decide" count={data.pending_requisitions} />}
+                  {s.isWarehouse && <AlertRow to="/requisitions" label="Approved requisitions to issue" count={data.awaiting_issue} />}
                 </ul>
               </Section>
+              {s.isWarehouse && (
               <Section title="Stock alerts">
                 <ul className="flex flex-col gap-2 text-sm">
                   <AlertRow to="/inventory" label="Batches near expiry" count={data.near_expiry_batches} tone="warning" />
@@ -198,6 +210,7 @@ function AdminDashboard() {
                   <AlertRow to="/reports" label="Products below reorder level" count={data.low_stock_products} tone="warning" />
                 </ul>
               </Section>
+              )}
             </div>
           </div>
         </div>

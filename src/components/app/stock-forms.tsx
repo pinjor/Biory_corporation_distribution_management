@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Download, FileUp } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { Section, Field, Qty, EmptyState } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
@@ -44,7 +44,7 @@ export function BatchReceiptForm({ type }: { type: "PURCHASE_RECEIPT" | "OPENING
   const set = (k: keyof typeof blank, v: string) => setF((x) => ({ ...x, [k]: v }));
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("receive_stock", {
+      const { error } = await api.rpc("receive_stock", {
         p_product: f.product,
         p_batch_no: f.batch,
         p_mfg: opt(f.mfg),
@@ -157,7 +157,7 @@ export function OpeningStockImport() {
   const m = useMutation({
     mutationFn: async () => {
       if (!result) return 0;
-      const { data, error } = await supabase.rpc("import_opening_stock", {
+      const { data, error } = await api.rpc("import_opening_stock", {
         p_rows: result.rows.map((r) => ({
           product_code: r.product_code,
           batch_no: r.batch_no,
@@ -324,7 +324,7 @@ export function RecentMovements({
   const { data = [], isLoading } = useQuery({
     queryKey: ["movements", types.join(",")],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("stock_movements")
         .select("*, batches(batch_no, expiry_date)")
         .in("movement_type", types)

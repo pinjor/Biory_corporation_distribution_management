@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Paperclip, Plus } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { PageHeader, Section, StatusBadge, EmptyState, Money } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ function ExpensesPage() {
   const { data = [], isLoading } = useQuery({
     queryKey: ["expenses", status, scope, category],
     queryFn: async () => {
-      let q = supabase
+      let q = api
         .from("expenses")
         .select("*, profiles!expenses_submitted_by_fkey(full_name, so_code)")
         .order("created_at", { ascending: false })

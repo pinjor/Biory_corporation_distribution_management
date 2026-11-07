@@ -3,7 +3,7 @@ import { onlineManager, useQueryClient } from "@tanstack/react-query";
 import { persistQueryClient } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { Outbox, syncOutbox, type QueuedOrder } from "@/lib/offline/outbox";
 import { queryCacheKey } from "@/lib/offline/session-cache";
 import { myAvailableStockQuery, myChemistsQuery, OFFLINE_QUERY_ROOTS, opt, productsQuery, settingsQuery, territoriesQuery } from "@/lib/queries";
@@ -52,11 +52,11 @@ export function useOffline() {
 
 /** Make sure the stored sign-in is still valid (refreshing it if needed) before sending queued orders. */
 async function ensureFreshSession(userId: string): Promise<boolean> {
-  const { data } = await supabase.auth.getSession();
+  const { data } = await api.auth.getSession();
   const s = data.session;
   if (!s || s.user.id !== userId) return false;
   if ((s.expires_at ?? 0) * 1000 > Date.now() + 30_000) return true;
-  const { data: r, error } = await supabase.auth.refreshSession();
+  const { data: r, error } = await api.auth.refreshSession();
   return !error && r.session?.user.id === userId;
 }
 
@@ -127,7 +127,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
           return;
         }
         const report = await syncOutbox(outbox, async (o) => {
-          const r = await supabase.rpc("create_order", {
+          const r = await api.rpc("create_order", {
             p_chemist: o.chemistId,
             p_items: o.items.map((i) => ({ product_id: i.product_id, qty: i.qty })),
             p_so_discount_pct: o.soPct,
@@ -138,13 +138,6 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
           return { data: r.data, error: r.error, status: r.status };
         });
         setLastSyncError(report.interrupted ? "Connection is unstable — will keep trying." : null);
-        for (const r of report.synced) {
-          const waitMinutes = Math.max(0, Math.round((Date.now() - new Date(r.order.createdAt).getTime()) / 60_000));
-          window.__lovableEvents?.track?.("project.offline_order_synced", { attempts: r.order.attempts + 1, wait_minutes: waitMinutes });
-        }
-        for (const r of report.rejected) {
-          window.__lovableEvents?.track?.("project.offline_order_rejected", { attempts: r.order.attempts + 1 });
-        }
         if (report.synced.length) {
           toast.success(report.synced.length === 1 ? `Order for ${report.synced[0]!.order.chemistName} synced` : `${report.synced.length} queued orders synced`);
           void qc.invalidateQueries({ queryKey: ["orders"] });

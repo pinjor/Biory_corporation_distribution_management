@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { FileText, HandCoins, Truck, Undo2 } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { PageHeader, Section, StatusBadge, KeyValue, PageLoader, Money, Qty, Field, EmptyState } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,7 @@ function useOrder(id: string) {
   return useQuery({
     queryKey: ["order", id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("orders")
         .select(
           "*, chemists(*), profiles!orders_so_id_fkey(full_name, so_code), order_items(*, products(name, code, pack_size)), deliveries(*), collections(*)",
@@ -57,7 +57,7 @@ function OrderDetail() {
   };
   const approve = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("decide_order", { p_id: id, p_approve: true, p_note: "Approved" });
+      const { error } = await api.rpc("decide_order", { p_id: id, p_approve: true, p_note: "Approved" });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Order approved"); refresh(); },
@@ -89,7 +89,7 @@ function OrderDetail() {
             {(mine || s.isAdmin) && ["PENDING_APPROVAL", "CONFIRMED"].includes(o.status) && o.delivery_status === "NOT_DELIVERED" && (
               <Button variant="ghost" onClick={() => setDialog("cancel")}>Cancel order</Button>
             )}
-            {mine && o.status === "CONFIRMED" && remaining > 0 && (
+            {(mine || (o.stock_from === "central" && s.isAdmin)) && o.status === "CONFIRMED" && remaining > 0 && (
               <Button onClick={() => setDialog("deliver")}><Truck /> Deliver</Button>
             )}
             {mine && due > 0 && (
@@ -242,8 +242,8 @@ function OrderDetail() {
           run={async (reason) => {
             const { error } =
               dialog === "reject"
-                ? await supabase.rpc("decide_order", { p_id: id, p_approve: false, p_note: reason })
-                : await supabase.rpc("cancel_order", { p_id: id, p_reason: reason });
+                ? await api.rpc("decide_order", { p_id: id, p_approve: false, p_note: reason })
+                : await api.rpc("cancel_order", { p_id: id, p_reason: reason });
             if (error) throw error;
             refresh();
           }}
@@ -256,7 +256,7 @@ function OrderDetail() {
           note="The original payment stays on record; a reversal entry is added and the SO wallet is debited."
           onClose={() => setReverse(null)}
           run={async (reason) => {
-            const { error } = await supabase.rpc("reverse_collection", { p_id: reverse, p_reason: reason });
+            const { error } = await api.rpc("reverse_collection", { p_id: reverse, p_reason: reason });
             if (error) throw error;
             refresh();
           }}
@@ -288,7 +288,7 @@ function DeliverDialog({ order, onClose, onDone }: { order: Order; onClose: () =
   const short = open.filter((i) => qtyFor(i) > (onHand.get(i.product_id) ?? 0));
   const m = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.rpc("deliver_order", {
+      const { data, error } = await api.rpc("deliver_order", {
         p_order: order.id,
         p_items: open.map((i) => ({ order_item_id: i.id, qty: qtyFor(i) })),
         p_remarks: opt(remarks),
@@ -298,13 +298,6 @@ function DeliverDialog({ order, onClose, onDone }: { order: Order; onClose: () =
       return data;
     },
     onSuccess: () => {
-      // Count the order only when this delivery hands over everything that was still owed.
-      if (open.every((i) => qtyFor(i) === i.qty - i.delivered_qty)) {
-        window.__lovableEvents?.track?.("project.order_delivered", {
-          line_count: order.order_items.length,
-          had_partial_deliveries: order.order_items.some((i) => i.delivered_qty > 0),
-        });
-      }
       toast.success("Delivery confirmed — challan generated");
       onDone();
       onClose();
@@ -394,7 +387,7 @@ function CollectDialog({ order, onClose, onDone }: { order: Order; onClose: () =
   const amt = mode === "FULL" ? due : Number(amount) || 0;
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("record_collection", {
+      const { error } = await api.rpc("record_collection", {
         p_order: order.id,
         p_amount: amt,
         p_method: method,

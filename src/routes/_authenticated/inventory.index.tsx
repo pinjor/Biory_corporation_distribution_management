@@ -7,12 +7,13 @@ import {
   PackageOpen,
   PackagePlus,
   SlidersHorizontal,
+  Store,
   UserRound,
   Warehouse,
 } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
+import { api } from "@/lib/api/client";
+import type { Database } from "@/lib/database.types";
 import {
   PageHeader,
   Section,
@@ -62,9 +63,11 @@ function InventoryPage() {
   const central = locations.find((l) => l.kind === "central");
   const mine = locations.find((l) => l.so_id === s.userId);
   const soLocs = locations.filter((l) => l.kind === "so");
-  const [tab, setTab] = useState<"central" | "so">(s.isStaff ? "central" : "so");
+  const partyLocs = locations.filter((l) => l.kind === "chemist" || l.kind === "doctor");
+  const [tab, setTab] = useState<"central" | "so" | "party">(s.isStaff ? "central" : "so");
   const [soLoc, setSoLoc] = useState<string>("");
-  const locId = tab === "central" ? central?.id : s.isStaff ? soLoc || soLocs[0]?.id : mine?.id;
+  const [partyLoc, setPartyLoc] = useState<string>("");
+  const locId = tab === "central" ? central?.id : tab === "party" ? partyLoc || partyLocs[0]?.id : s.isStaff ? soLoc || soLocs[0]?.id : mine?.id;
   const [kind, setKind] = useState("");
   const [expiry, setExpiry] = useState("");
   const [q, setQ] = useState("");
@@ -76,7 +79,7 @@ function InventoryPage() {
     queryKey: ["stock", locId],
     enabled: !!locId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("v_stock")
         .select("*")
         .eq("location_id", locId!)
@@ -156,7 +159,7 @@ function InventoryPage() {
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Tabs value={tab} onValueChange={(v) => setTab(v as "central" | "so")}>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as "central" | "so" | "party")}>
           <TabsList>
             <TabsTrigger value="central">
               <Warehouse /> Central warehouse
@@ -164,8 +167,25 @@ function InventoryPage() {
             <TabsTrigger value="so">
               <UserRound /> {s.isStaff ? "SO stock" : "My stock"}
             </TabsTrigger>
+            <TabsTrigger value="party">
+              <Store /> Chemist & doctor
+            </TabsTrigger>
           </TabsList>
         </Tabs>
+        {tab === "party" && (
+          <NativeSelect
+            className="w-60"
+            value={partyLoc || partyLocs[0]?.id || ""}
+            onChange={(e) => setPartyLoc(e.target.value)}
+          >
+            {partyLocs.length === 0 && <option value="">No chemist or doctor stock yet</option>}
+            {partyLocs.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.kind === "doctor" ? "Doctor" : "Chemist"} · {l.name}
+              </option>
+            ))}
+          </NativeSelect>
+        )}
         {tab === "so" && s.isStaff && (
           <NativeSelect
             className="w-60"
@@ -409,7 +429,7 @@ function AdjustDialog({ row, onClose }: { row: StockRow; onClose: () => void }) 
   const [reason, setReason] = useState("");
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("adjust_stock", {
+      const { error } = await api.rpc("adjust_stock", {
         p_location: row.location_id!,
         p_batch: row.batch_id!,
         p_qty: Number(qty),
@@ -470,14 +490,14 @@ function TransferDialog({ row, onClose }: { row: StockRow; onClose: () => void }
   const qc = useQueryClient();
   const { data: locations = [] } = useQuery(locationsQuery);
   const targets = locations.filter(
-    (l) => l.id !== row.location_id && !(row.location_kind === "central" && l.kind === "central"),
+    (l) => (l.kind === "central" || l.kind === "so") && l.id !== row.location_id && !(row.location_kind === "central" && l.kind === "central"),
   );
   const [to, setTo] = useState(targets[0]?.id ?? "");
   const [qty, setQty] = useState("");
   const [reason, setReason] = useState("");
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("transfer_stock", {
+      const { error } = await api.rpc("transfer_stock", {
         p_from: row.location_id!,
         p_to: to,
         p_batch: row.batch_id!,

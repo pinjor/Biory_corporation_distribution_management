@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { AlertTriangle, MapPin } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { Field } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
@@ -78,7 +78,7 @@ export function PartyDialog({ kind, initial, onClose }: { kind: PartyKind; initi
         p_place: debounced.place,
         ...(initial?.["id"] ? { p_exclude: String(initial["id"]) } : {}),
       };
-      const { data, error } = await supabase.rpc("find_party_duplicates", args);
+      const { data, error } = await api.rpc("find_party_duplicates", args);
       if (error) throw error;
       return data;
     },
@@ -96,8 +96,8 @@ export function PartyDialog({ kind, initial, onClose }: { kind: PartyKind; initi
       if (s.isAdmin && f["assigned_so"]) payload["assigned_so"] = f["assigned_so"];
       const table = kind === "chemist" ? "chemists" : "doctors";
       const { error } = editing
-        ? await supabase.from(table).update(payload as never).eq("id", String(initial!["id"]))
-        : await supabase.from(table).insert(payload as never);
+        ? await api.from(table).update(payload as never).eq("id", String(initial!["id"]))
+        : await api.from(table).insert(payload as never);
       if (error) {
         if (error.message.includes("mobile_uq")) throw new Error("Another record already uses this mobile number.");
         throw error;

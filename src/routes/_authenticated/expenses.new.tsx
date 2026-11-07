@@ -3,11 +3,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Camera, FileText, Send, X } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { PageHeader, Section, Field } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { useOnline } from "@/components/app/offline-provider";
 import { Button } from "@/components/ui/button";
+import { IconTip } from "@/components/ui/icon-tip";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/lib/session";
@@ -49,11 +50,11 @@ function NewExpense() {
       const paths: string[] = [];
       for (const file of files) {
         const path = `${s.userId}/${crypto.randomUUID()}.${RECEIPT_TYPES[file.type]}`;
-        const { error } = await supabase.storage.from("expense-receipts").upload(path, file, { contentType: file.type, upsert: false });
+        const { error } = await api.storage.from("expense-receipts").upload(path, file, { contentType: file.type, upsert: false });
         if (error) throw new Error(`Couldn't upload ${file.name}: ${error.message}`);
         paths.push(path);
       }
-      const { data, error } = await supabase.rpc("submit_expense", {
+      const { data, error } = await api.rpc("submit_expense", {
         p_date: f.date,
         p_category: f.category,
         p_amount: amt,
@@ -65,7 +66,6 @@ function NewExpense() {
       return data as string;
     },
     onSuccess: (id) => {
-      window.__lovableEvents?.track?.("project.expense_submitted", { category: f.category, receipt_count: files.length });
       toast.success("Expense submitted for Finance review");
       qc.invalidateQueries({ queryKey: ["expenses"] });
       navigate({ to: "/expenses/$id", params: { id } });
@@ -131,6 +131,7 @@ function NewExpense() {
                     aria-label={`Remove ${file.name}`}
                   >
                     <X className="size-4" />
+                    <IconTip label={`Remove ${file.name}`} />
                   </button>
                 </li>
               ))}

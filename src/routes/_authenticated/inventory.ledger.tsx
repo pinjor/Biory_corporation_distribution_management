@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { PageHeader, Section, Qty, EmptyState } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,7 @@ function LedgerPage() {
   const { data = [], isLoading } = useQuery({
     queryKey: ["ledger", product, type, loc, limit],
     queryFn: async () => {
-      let q = supabase.from("stock_movements").select("*, batches(batch_no, expiry_date)").order("performed_at", { ascending: false }).limit(limit);
+      let q = api.from("stock_movements").select("*, batches(batch_no, expiry_date)").order("performed_at", { ascending: false }).limit(limit);
       if (product) q = q.eq("product_id", product);
       if (type) q = q.eq("movement_type", type);
       if (loc) q = q.or(`from_location.eq.${loc},to_location.eq.${loc}`);

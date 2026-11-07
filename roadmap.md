@@ -2,7 +2,7 @@
 
 ## Phase 1 (this build)
 - [x] Cloud backend: roles, settings, products, batches, locations, stock ledger, requisitions, chemists, doctors, orders, deliveries, collections, wallet ledger, deposits, visits, audit, notifications
-- [x] Sign-in (email, Google, Lovable) + role-gated app shell
+- [x] Sign-in (email and password) + role-gated app shell
 - [x] Dashboard (admin KPIs + SO home)
 - [x] Products & pricing policy settings
 - [x] Central/SO inventory, stock receipt, CSV bulk opening stock, adjustments, ledger

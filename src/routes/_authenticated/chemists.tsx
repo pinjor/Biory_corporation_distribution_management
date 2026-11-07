@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Pencil, Plus, ShoppingCart } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { PageHeader, Section, StatusBadge, EmptyState, Money } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { PartyDialog } from "@/components/app/party-form";
@@ -27,7 +27,7 @@ function ChemistsPage() {
   const { data = [], isLoading } = useQuery({
     queryKey: ["chemists"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("chemists")
         .select("*, profiles!chemists_assigned_so_fkey(full_name, so_code), territories(name)")
         .order("business_name");
@@ -38,7 +38,7 @@ function ChemistsPage() {
   const { data: dues = [] } = useQuery({
     queryKey: ["chemist-dues"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("orders").select("chemist_id, due").gt("due", 0).neq("status", "CANCELLED");
+      const { data, error } = await api.from("orders").select("chemist_id, due").gt("due", 0).neq("status", "CANCELLED");
       if (error) throw error;
       return data;
     },
@@ -135,9 +135,9 @@ function ChemistsPage() {
                   </TableCell>
                   <TableCell><StatusBadge status={c.status} /></TableCell>
                   <TableCell className="whitespace-nowrap text-right">
-                    {s.isSO && c.assigned_so === s.userId && c.status === "active" && (
+                    {((s.isSO && c.assigned_so === s.userId) || (s.isSuper && c.assigned_so)) && c.status === "active" && (
                       <Button asChild variant="ghost" size="icon" aria-label="New order">
-                        <Link to="/orders/new" search={{ chemist: c.id }}><ShoppingCart /></Link>
+                        <Link to="/orders/new" search={{ chemist: c.id, so: c.assigned_so ?? undefined }}><ShoppingCart /></Link>
                       </Button>
                     )}
                     {(s.isAdmin || c.assigned_so === s.userId) && (

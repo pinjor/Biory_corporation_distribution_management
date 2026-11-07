@@ -1,5 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 
 /** Lists the order form needs offline are kept for a day in memory and persisted on the device. */
 const OFFLINE_GC = 24 * 60 * 60 * 1000;
@@ -8,7 +8,7 @@ export const OFFLINE_QUERY_ROOTS = new Set(["settings", "products", "chemists", 
 export const settingsQuery = queryOptions({
   queryKey: ["settings"],
   queryFn: async () => {
-    const { data, error } = await supabase.from("app_settings").select("*").eq("id", 1).single();
+    const { data, error } = await api.from("app_settings").select("*").eq("id", 1).single();
     if (error) throw error;
     return data;
   },
@@ -19,7 +19,7 @@ export const settingsQuery = queryOptions({
 export const productsQuery = queryOptions({
   queryKey: ["products"],
   queryFn: async () => {
-    const { data, error } = await supabase.from("products").select("*").order("name");
+    const { data, error } = await api.from("products").select("*").order("name");
     if (error) throw error;
     return data;
   },
@@ -30,7 +30,7 @@ export const productsQuery = queryOptions({
 export const territoriesQuery = queryOptions({
   queryKey: ["territories"],
   queryFn: async () => {
-    const { data, error } = await supabase.from("territories").select("*").order("name");
+    const { data, error } = await api.from("territories").select("*").order("name");
     if (error) throw error;
     return data;
   },
@@ -40,7 +40,7 @@ export const territoriesQuery = queryOptions({
 export const locationsQuery = queryOptions({
   queryKey: ["locations"],
   queryFn: async () => {
-    const { data, error } = await supabase.from("locations").select("*").order("kind").order("name");
+    const { data, error } = await api.from("locations").select("*").order("kind").order("name");
     if (error) throw error;
     return data;
   },
@@ -51,11 +51,11 @@ export const locationsQuery = queryOptions({
 export const salesOfficersQuery = queryOptions({
   queryKey: ["sales-officers"],
   queryFn: async () => {
-    const { data: roles, error } = await supabase.from("user_roles").select("user_id").eq("role", "sales_officer");
+    const { data: roles, error } = await api.from("user_roles").select("user_id").eq("role", "sales_officer");
     if (error) throw error;
     const ids = roles.map((r) => r.user_id);
     if (ids.length === 0) return [];
-    const { data, error: e2 } = await supabase.from("profiles").select("*").in("id", ids).order("full_name");
+    const { data, error: e2 } = await api.from("profiles").select("*").in("id", ids).order("full_name");
     if (e2) throw e2;
     return data;
   },
@@ -65,7 +65,7 @@ export const salesOfficersQuery = queryOptions({
 export const profilesQuery = queryOptions({
   queryKey: ["profiles"],
   queryFn: async () => {
-    const { data, error } = await supabase.from("profiles").select("*").order("full_name");
+    const { data, error } = await api.from("profiles").select("*").order("full_name");
     if (error) throw error;
     return data;
   },
@@ -75,9 +75,9 @@ export const profilesQuery = queryOptions({
 export const myAvailableStockQuery = queryOptions({
   queryKey: ["my-available-stock"],
   queryFn: async () => {
-    const { data, error } = await supabase.rpc("my_available_stock");
+    const { data, error } = await api.rpc("my_available_stock");
     if (error) throw error;
-    return data;
+    return (data ?? []) as any[];
   },
   gcTime: OFFLINE_GC,
 });
@@ -87,7 +87,7 @@ export const myChemistsQuery = (userId: string) =>
   queryOptions({
     queryKey: ["chemists", "mine", userId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("chemists")
         .select("*")
         .eq("assigned_so", userId)

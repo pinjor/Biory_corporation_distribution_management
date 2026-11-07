@@ -3,12 +3,12 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Minus, Plus, Warehouse } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { PageHeader, Section, Qty, Field } from "@/components/app/page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { opt, productsQuery, locationsQuery, salesOfficersQuery } from "@/lib/queries";
+import { opt, productsQuery, locationsQuery } from "@/lib/queries";
 import { NativeSelect } from "@/components/app/select-native";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useSession } from "@/lib/session";
@@ -29,7 +29,7 @@ function NewRequisition() {
     queryKey: ["central-available", central?.id],
     enabled: !!central,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("v_stock")
         .select("product_id, qty, days_to_expiry")
         .eq("location_id", central!.id);
@@ -47,37 +47,59 @@ function NewRequisition() {
   const [qty, setQty] = useState<Record<string, number>>({});
   const [q, setQ] = useState("");
   const [remarks, setRemarks] = useState("");
+  const [partyKind, setPartyKind] = useState<"chemist" | "doctor">("chemist");
+  const [partyId, setPartyId] = useState("");
+  const [approveNow, setApproveNow] = useState(true);
+  const { data: chemists = [] } = useQuery({
+    queryKey: ["chemists", "requisition", s.isWarehouse ? "all" : s.userId],
+    queryFn: async () => {
+      let q = api.from("chemists").select("id, business_name, code, assigned_so").eq("status", "active").order("business_name");
+      if (!s.isWarehouse) q = q.eq("assigned_so", s.userId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const { data: doctors = [] } = useQuery({
+    queryKey: ["doctors", "requisition", s.isWarehouse ? "all" : s.userId],
+    queryFn: async () => {
+      let q = api.from("doctors").select("id, name, code, assigned_so").eq("status", "active").order("name");
+      if (!s.isWarehouse) q = q.eq("assigned_so", s.userId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const parties = partyKind === "chemist" ? chemists : doctors;
+  const selectedParty = parties.find((p) => p.id === partyId);
+  const target = selectedParty?.assigned_so ?? "";
   const list = products.filter(
     (p) => p.active && (!q || `${p.name} ${p.code}`.toLowerCase().includes(q.toLowerCase())),
   );
   const items = Object.entries(qty).filter(([, v]) => v > 0);
-  // Staff (Super Admin / Admin / Warehouse Admin) raise requisitions on behalf of a Sales Officer.
-  const { data: officers = [] } = useQuery({ ...salesOfficersQuery, enabled: s.isWarehouse });
-  const [forSo, setForSo] = useState<string>("");
-  const [approveNow, setApproveNow] = useState(true);
-  const target = s.isWarehouse ? forSo || (s.isSO ? s.userId : "") : s.userId;
-  const onBehalf = s.isWarehouse && target !== "" && target !== s.userId;
-
   const m = useMutation({
     mutationFn: async () => {
       const p_items = items.map(([product_id, q]) => ({ product_id, qty: q }));
-      const { data, error } = onBehalf
-        ? await supabase.rpc("submit_requisition_for", {
+      const { data, error } = s.isWarehouse
+        ? await api.rpc("submit_requisition_for", {
             p_so: target,
             p_items,
             p_remarks: opt(remarks),
             p_approve: approveNow,
+            p_party_kind: partyKind,
+            p_party_id: partyId,
           })
-        : await supabase.rpc("submit_requisition", { p_items, p_remarks: opt(remarks) });
+        : await api.rpc("submit_requisition", {
+            p_items,
+            p_remarks: opt(remarks),
+            p_party_kind: partyKind,
+            p_party_id: partyId,
+          });
       if (error) throw error;
       return data;
     },
     onSuccess: (id) => {
-      toast.success(
-        onBehalf && approveNow
-          ? "Requisition raised and approved — ready to issue"
-          : "Requisition submitted",
-      );
+      toast.success(s.isWarehouse && approveNow ? "Requisition submitted and approved" : "Requisition submitted");
       navigate({ to: "/requisitions/$id", params: { id: id as string } });
     },
     onError: (e) => toast.error(errorMessage(e)),
@@ -96,53 +118,52 @@ function NewRequisition() {
     <div className="pb-24">
       <PageHeader
         title="New requisition"
-        description={
-          s.isWarehouse
-            ? "Raise a requisition from the central warehouse to a Sales Officer, then issue against it."
-            : "Request saleable and promotional stock from the central warehouse."
-        }
+        description="A chemist shop or doctor requests stock. Super Admin issues it from company stock, and confirming receipt adds it on that chemist or doctor."
       />
-      {s.isWarehouse && (
-        <Section title="Requisition for" className="mb-6">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Sales Officer (receives the stock)">
-              <NativeSelect value={target} onChange={(e) => setForSo(e.target.value)} required>
-                {!s.isSO && <option value="">Choose a Sales Officer…</option>}
-                {s.isSO && <option value={s.userId}>Myself</option>}
-                {officers
-                  .filter((o) => o.id !== s.userId)
-                  .map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.full_name || o.email} {o.so_code ? `(${o.so_code})` : ""}
-                    </option>
-                  ))}
-              </NativeSelect>
-            </Field>
-            <div className="flex flex-col justify-end gap-1.5 text-sm">
-              <span className="font-medium">From</span>
-              <div className="flex h-9 items-center gap-2 rounded-lg border bg-muted/50 px-3 text-muted-foreground">
-                <Warehouse className="size-4" /> Central Warehouse
-              </div>
+      <Section title="Who is requesting" className="mb-6">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Party">
+            <NativeSelect
+              value={partyKind}
+              onChange={(e) => {
+                setPartyKind(e.target.value as "chemist" | "doctor");
+                setPartyId("");
+              }}
+            >
+              <option value="chemist">Chemist shop</option>
+              <option value="doctor">Doctor</option>
+            </NativeSelect>
+          </Field>
+          <Field label={partyKind === "chemist" ? "Chemist shop" : "Doctor"}>
+            <NativeSelect value={partyId} onChange={(e) => setPartyId(e.target.value)}>
+              <option value="">{partyKind === "chemist" ? "Choose chemist shop…" : "Choose doctor…"}</option>
+              {parties.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {"business_name" in p ? p.business_name : p.name} {p.code ? `· ${p.code}` : ""}
+                </option>
+              ))}
+            </NativeSelect>
+          </Field>
+          <div className="flex flex-col justify-end gap-1.5 text-sm">
+            <span className="font-medium">From</span>
+            <div className="flex h-9 items-center gap-2 rounded-lg border bg-muted/50 px-3 text-muted-foreground">
+              <Warehouse className="size-4" /> Company stock (Super Admin)
             </div>
-            {onBehalf && (
-              <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border bg-primary-soft/50 p-3 text-sm sm:col-span-2">
-                <Checkbox
-                  checked={approveNow}
-                  onCheckedChange={(v) => setApproveNow(v === true)}
-                  className="mt-0.5"
-                />
-                <span>
-                  <span className="font-medium">Approve now</span>
-                  <span className="block text-xs text-muted-foreground">
-                    Skip the approval step so you can issue stock against this requisition straight
-                    away.
-                  </span>
-                </span>
-              </label>
-            )}
           </div>
-        </Section>
-      )}
+          {selectedParty && !selectedParty.assigned_so && (
+            <p className="text-sm text-destructive sm:col-span-2">Assign a Sales Officer to this party before requesting stock.</p>
+          )}
+          {s.isWarehouse && (
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border bg-primary-soft/50 p-3 text-sm sm:col-span-2">
+              <Checkbox checked={approveNow} onCheckedChange={(v) => setApproveNow(v === true)} className="mt-0.5" />
+              <span>
+                <span className="font-medium">Approve now</span>
+                <span className="block text-xs text-muted-foreground">You can then issue it straight away. Issuing takes the quantity off company stock.</span>
+              </span>
+            </label>
+          )}
+        </div>
+      </Section>
       <Section
         title="Products"
         actions={
@@ -214,16 +235,10 @@ function NewRequisition() {
             {items.length} products · <Qty value={items.reduce((a, [, v]) => a + v, 0)} /> units
           </span>
           <Button
-            disabled={items.length === 0 || !target || m.isPending}
+            disabled={items.length === 0 || !partyId || !target || m.isPending}
             onClick={() => m.mutate()}
           >
-            {m.isPending
-              ? "Submitting…"
-              : onBehalf
-                ? approveNow
-                  ? "Raise & approve"
-                  : "Raise requisition"
-                : "Submit requisition"}
+            {m.isPending ? "Submitting…" : s.isWarehouse && approveNow ? "Submit & approve" : "Submit requisition"}
           </Button>
         </div>
       </div>

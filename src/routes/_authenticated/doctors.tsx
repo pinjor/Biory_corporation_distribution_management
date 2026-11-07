@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Pencil, Plus, Stethoscope } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { PageHeader, Section, StatusBadge, EmptyState } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { PartyDialog } from "@/components/app/party-form";
@@ -27,7 +27,7 @@ function DoctorsPage() {
   const { data = [], isLoading } = useQuery({
     queryKey: ["doctors"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("doctors")
         .select("*, profiles!doctors_assigned_so_fkey(full_name, so_code), territories(name)")
         .order("name");

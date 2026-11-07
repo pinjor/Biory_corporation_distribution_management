@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { MapPin } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { PageHeader, Section, Field, Qty, EmptyState } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ function NewVisit() {
   const { data: doctors = [] } = useQuery({
     queryKey: ["doctors", "mine"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("doctors").select("*").eq("assigned_so", s.userId).eq("status", "active").order("name");
+      const { data, error } = await api.from("doctors").select("*").eq("assigned_so", s.userId).eq("status", "active").order("name");
       if (error) throw error;
       return data;
     },
@@ -54,7 +54,7 @@ function NewVisit() {
 
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("record_doctor_visit", {
+      const { error } = await api.rpc("record_doctor_visit", {
         p_doctor: doctor,
         p_date: date,
         p_start: opt(start),

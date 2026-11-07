@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { CheckCircle2, ExternalLink, FileText, Undo2 } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import { PageHeader, Section, StatusBadge, KeyValue, PageLoader, Money, EmptyState } from "@/components/app/page";
 import { ReasonDialog } from "@/components/app/reason-dialog";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ function ExpenseDetail() {
   const { data: e, isLoading } = useQuery({
     queryKey: ["expense", id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("expenses")
         .select("*, profiles!expenses_submitted_by_fkey(full_name, so_code, email)")
         .eq("id", id)
@@ -39,7 +39,7 @@ function ExpenseDetail() {
     queryKey: ["expense-receipts", id, e?.receipt_paths],
     enabled: !!e && e.receipt_paths.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase.storage.from("expense-receipts").createSignedUrls(e!.receipt_paths, 600);
+      const { data, error } = await api.storage.from("expense-receipts").createSignedUrls(e!.receipt_paths, 600);
       if (error) throw error;
       return data.map((r, i) => ({ path: e!.receipt_paths[i]!, url: r.signedUrl ?? "", isPdf: e!.receipt_paths[i]!.endsWith(".pdf") }));
     },
@@ -52,11 +52,10 @@ function ExpenseDetail() {
   };
   const approve = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("review_expense", { p_id: id, p_approve: true, p_note: "" });
+      const { error } = await api.rpc("review_expense", { p_id: id, p_approve: true, p_note: "" });
       if (error) throw error;
     },
     onSuccess: () => {
-      window.__lovableEvents?.track?.("project.expense_reviewed", { decision: "approved", category: e?.category ?? "OTHER" });
       toast.success("Expense approved");
       refresh();
     },
@@ -64,7 +63,7 @@ function ExpenseDetail() {
   });
   const withdraw = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("cancel_expense", { p_id: id });
+      const { error } = await api.rpc("cancel_expense", { p_id: id });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -172,9 +171,8 @@ function ExpenseDetail() {
           note="The submitter sees this reason. They can submit a corrected claim."
           onClose={() => setReject(false)}
           run={async (reason) => {
-            const { error } = await supabase.rpc("review_expense", { p_id: id, p_approve: false, p_note: reason });
+            const { error } = await api.rpc("review_expense", { p_id: id, p_approve: false, p_note: reason });
             if (error) throw error;
-            window.__lovableEvents?.track?.("project.expense_reviewed", { decision: "rejected", category: e.category });
             refresh();
           }}
         />

@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api/client";
 import {
   PageHeader,
   Section,
@@ -41,7 +41,7 @@ function RequisitionDetail() {
   const { data: r, isLoading } = useQuery({
     queryKey: ["requisition", id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("requisitions")
         .select(
           "*, profiles!requisitions_so_id_fkey(full_name, so_code), requisition_items(*, products(name, code, kind))",
@@ -56,7 +56,7 @@ function RequisitionDetail() {
     queryKey: ["central-available", central?.id],
     enabled: !!central && s.isWarehouse,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("v_stock")
         .select("product_id, qty, days_to_expiry")
         .eq("location_id", central!.id);
@@ -68,11 +68,11 @@ function RequisitionDetail() {
     queryKey: ["req-moves", id],
     enabled: !!r && ["ISSUED", "RECEIVED"].includes(r.status),
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("stock_movements")
         .select("*, products(name), batches(batch_no, expiry_date)")
         .eq("reference_id", id)
-        .eq("movement_type", "CENTRAL_TO_SO_TRANSFER");
+        .in("movement_type", ["REQUISITION_ISSUE", "REQUISITION_RECEIPT", "CENTRAL_TO_SO_TRANSFER"]);
       if (error) throw error;
       return data;
     },
@@ -100,7 +100,7 @@ function RequisitionDetail() {
   };
   const decide = useMutation({
     mutationFn: async (reject: boolean) => {
-      const { error } = await supabase.rpc("decide_requisition", {
+      const { error } = await api.rpc("decide_requisition", {
         p_id: id,
         p_items: Object.entries(approved).map(([item_id, approved_qty]) => ({
           item_id,
@@ -119,29 +119,31 @@ function RequisitionDetail() {
   });
   const issue = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("issue_requisition", { p_id: id });
+      const { error } = await api.rpc("issue_requisition", { p_id: id });
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Stock issued to SO (FEFO)");
+      toast.success("Issued. Company stock is down until the chemist or doctor confirms receipt.");
       refresh();
     },
     onError: (e) => toast.error(errorMessage(e)),
   });
   const receive = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("receive_requisition", { p_id: id });
+      const { error } = await api.rpc("receive_requisition", { p_id: id });
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Receipt confirmed");
+      toast.success(
+        r?.party_kind === "doctor" ? "Doctor received the stock" : r?.party_kind === "chemist" ? "Chemist shop received the stock" : "Receipt confirmed",
+      );
       refresh();
     },
     onError: (e) => toast.error(errorMessage(e)),
   });
   const cancel = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("cancel_requisition", { p_id: id });
+      const { error } = await api.rpc("cancel_requisition", { p_id: id });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -151,10 +153,26 @@ function RequisitionDetail() {
     onError: (e) => toast.error(errorMessage(e)),
   });
 
+  const { data: partyName } = useQuery({
+    queryKey: ["req-party", r?.party_kind, r?.party_id],
+    enabled: !!r?.party_id,
+    queryFn: async () => {
+      if (r?.party_kind === "doctor") {
+        const { data, error } = await api.from("doctors").select("name").eq("id", r.party_id).maybeSingle();
+        if (error) throw error;
+        return data?.name as string | undefined;
+      }
+      const { data, error } = await api.from("chemists").select("business_name").eq("id", r!.party_id).maybeSingle();
+      if (error) throw error;
+      return data?.business_name as string | undefined;
+    },
+  });
+
   if (isLoading || !r) return <PageLoader />;
   const canDecide = s.isWarehouse && r.status === "SUBMITTED";
-  const canIssue = s.isWarehouse && ["APPROVED", "PARTIALLY_APPROVED"].includes(r.status);
+  const canIssue = s.isWarehouse && ["SUBMITTED", "APPROVED", "PARTIALLY_APPROVED"].includes(r.status);
   const canReceive = (r.so_id === s.userId || s.isAdmin) && r.status === "ISSUED";
+  const partyLabel = r.party_kind === "doctor" ? "Doctor" : r.party_kind === "chemist" ? "Chemist shop" : "Sales Officer";
   const canCancel = (r.so_id === s.userId || s.isAdmin) && r.status === "SUBMITTED";
 
   return (
@@ -176,7 +194,7 @@ function RequisitionDetail() {
             )}
             {canIssue && (
               <Button onClick={() => issue.mutate()} disabled={issue.isPending}>
-                {issue.isPending ? "Issuing…" : "Issue stock (FEFO)"}
+                {issue.isPending ? "Issuing…" : "Issue stock"}
               </Button>
             )}
             {canReceive && (
@@ -185,7 +203,7 @@ function RequisitionDetail() {
                 onClick={() => receive.mutate()}
                 disabled={receive.isPending}
               >
-                {r.so_id === s.userId ? "Confirm received" : "Confirm received for SO"}
+                {r.party_kind === "doctor" ? "Confirm doctor received" : r.party_kind === "chemist" ? "Confirm chemist received" : "Confirm received"}
               </Button>
             )}
           </>
@@ -254,6 +272,7 @@ function RequisitionDetail() {
           <Section title="Details">
             <KeyValue
               items={[
+                [partyLabel, partyName || (r.party_kind ? "—" : `${r.profiles?.full_name ?? ""}`)],
                 ["Sales Officer", `${r.profiles?.full_name ?? ""} ${r.profiles?.so_code ?? ""}`],
                 ["Submitted", formatDateTime(r.created_at)],
                 ["Decided", formatDateTime(r.decided_at)],
