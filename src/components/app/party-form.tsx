@@ -1,14 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { AlertTriangle, MapPin } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api/client";
 import { Field } from "@/components/app/page";
+import { PlaceCombo } from "@/components/app/place-combo";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { salesOfficersQuery, territoriesQuery } from "@/lib/queries";
+import { geoPlacesQuery, territoriesQuery, type GeoPlace } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { errorMessage } from "@/lib/format";
 
@@ -24,7 +25,7 @@ const CHEMIST_FIELDS: FieldDef[] = [
   { key: "address", label: "Address", span: true },
   { key: "division", label: "Division" },
   { key: "district", label: "District" },
-  { key: "upazila", label: "Upazila / area" },
+  { key: "upazila", label: "Upazila" },
   { key: "route", label: "Route" },
   { key: "drug_license_no", label: "Drug licence no." },
   { key: "credit_limit", label: "Credit limit (৳, 0 = none)", type: "number" },
@@ -47,7 +48,7 @@ export function PartyDialog({ kind, initial, onClose }: { kind: PartyKind; initi
   const s = useSession();
   const qc = useQueryClient();
   const { data: territories = [] } = useQuery(territoriesQuery);
-  const { data: sos = [] } = useQuery({ ...salesOfficersQuery, enabled: s.isAdmin });
+  const { data: places = [] } = useQuery({ ...geoPlacesQuery, enabled: kind === "chemist" });
   const fields = kind === "chemist" ? CHEMIST_FIELDS : DOCTOR_FIELDS;
   const [f, setF] = useState<Values>(() => ({
     status: "active",
@@ -91,9 +92,6 @@ export function PartyDialog({ kind, initial, onClose }: { kind: PartyKind; initi
         const v = f[d.key];
         payload[d.key] = d.type === "number" ? Number(v ?? 0) : v === "" || v === undefined ? null : String(v).trim();
       }
-      payload["latitude"] = f["latitude"] === "" || f["latitude"] == null ? null : Number(f["latitude"]);
-      payload["longitude"] = f["longitude"] === "" || f["longitude"] == null ? null : Number(f["longitude"]);
-      if (s.isAdmin && f["assigned_so"]) payload["assigned_so"] = f["assigned_so"];
       const table = kind === "chemist" ? "chemists" : "doctors";
       const { error } = editing
         ? await api.from(table).update(payload as never).eq("id", String(initial!["id"]))
@@ -110,20 +108,6 @@ export function PartyDialog({ kind, initial, onClose }: { kind: PartyKind; initi
     },
     onError: (e) => toast.error(errorMessage(e)),
   });
-
-  function useGps() {
-    if (!navigator.geolocation) {
-      toast.error("Location isn't available on this device");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (p) => {
-        set("latitude", Number(p.coords.latitude.toFixed(6)));
-        set("longitude", Number(p.coords.longitude.toFixed(6)));
-      },
-      () => toast.error("Couldn't read your location"),
-    );
-  }
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -142,25 +126,28 @@ export function PartyDialog({ kind, initial, onClose }: { kind: PartyKind; initi
               {dupes.map((d) => (
                 <li key={d.id}>
                   <span className="num">{d.code}</span> {d.name} · {d.mobile ?? "no mobile"} · {d.place ?? ""} — {d.reason}
-                  {d.assigned_to ? ` (assigned to ${d.assigned_to})` : ""}
                 </li>
               ))}
             </ul>
           </div>
         )}
         <div className="grid gap-4 sm:grid-cols-2">
-          {fields.map((d) => (
-            <div key={d.key} className={d.span ? "sm:col-span-2" : ""}>
-              <Field label={d.label}>
-                <Input
-                  type={d.type ?? "text"}
-                  required={d.required}
-                  value={(f[d.key] ?? "") as string}
-                  onChange={(e) => set(d.key, e.target.value)}
-                />
-              </Field>
-            </div>
-          ))}
+          {fields.map((d) =>
+            kind === "chemist" && (d.key === "division" || d.key === "district" || d.key === "upazila") ? (
+              <PlaceField key={d.key} level={d.key} label={d.label} places={places} values={f} set={set} />
+            ) : (
+              <div key={d.key} className={d.span ? "sm:col-span-2" : ""}>
+                <Field label={d.label}>
+                  <Input
+                    type={d.type ?? "text"}
+                    required={d.required}
+                    value={(f[d.key] ?? "") as string}
+                    onChange={(e) => set(d.key, e.target.value)}
+                  />
+                </Field>
+              </div>
+            ),
+          )}
           <Field label="Territory">
             <NativeSelect value={(f["territory_id"] as string) ?? ""} onChange={(e) => set("territory_id", e.target.value || null)}>
               <option value="">—</option>
@@ -177,37 +164,123 @@ export function PartyDialog({ kind, initial, onClose }: { kind: PartyKind; initi
               <option value="inactive">Inactive</option>
             </NativeSelect>
           </Field>
-          {s.isAdmin && (
-            <Field label="Assigned Sales Officer">
-              <NativeSelect value={(f["assigned_so"] as string) ?? ""} onChange={(e) => set("assigned_so", e.target.value || null)}>
-                <option value="">Choose SO…</option>
-                {sos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.full_name} {p.so_code ? `(${p.so_code})` : ""}
-                  </option>
-                ))}
-              </NativeSelect>
-            </Field>
-          )}
-          <Field label="Location (GPS)">
-            <div className="flex gap-2">
-              <Input placeholder="Lat" value={(f["latitude"] ?? "") as string} onChange={(e) => set("latitude", e.target.value)} />
-              <Input placeholder="Lng" value={(f["longitude"] ?? "") as string} onChange={(e) => set("longitude", e.target.value)} />
-              <Button type="button" variant="outline" size="icon" onClick={useGps} aria-label="Use my location">
-                <MapPin />
-              </Button>
-            </div>
-          </Field>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={() => save.mutate()} disabled={save.isPending || !name.trim() || (s.isAdmin && !editing && !f["assigned_so"])}>
+          <Button onClick={() => save.mutate()} disabled={save.isPending || !name.trim()}>
             {save.isPending ? "Saving…" : "Save"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function namesFor(places: GeoPlace[], level: GeoPlace["level"], parentId: string | null, current: string) {
+  const rows = places
+    .filter((place) => place.level === level && (level === "division" ? place.parent_id == null : place.parent_id === parentId))
+    .map((place) => place.name);
+  const unique = [...new Set(rows)].sort((a, b) => a.localeCompare(b));
+  if (current && !unique.some((name) => name.toLowerCase() === current.toLowerCase())) unique.unshift(current);
+  return unique;
+}
+
+function PlaceField({
+  level,
+  label,
+  places,
+  values,
+  set,
+}: {
+  level: "division" | "district" | "upazila";
+  label: string;
+  places: GeoPlace[];
+  values: Values;
+  set: (key: string, value: string | number | null) => void;
+}) {
+  const qc = useQueryClient();
+  const division = String(values["division"] ?? "");
+  const district = String(values["district"] ?? "");
+  const upazila = String(values["upazila"] ?? "");
+  const divisionRow = places.find((place) => place.level === "division" && place.name.toLowerCase() === division.toLowerCase());
+  const districtRow = places.find(
+    (place) => place.level === "district" && place.parent_id === divisionRow?.id && place.name.toLowerCase() === district.toLowerCase(),
+  );
+  const parent = level === "division" ? null : level === "district" ? divisionRow : districtRow;
+  const ready = level === "division" || !!parent;
+  const current = level === "division" ? division : level === "district" ? district : upazila;
+  const options = namesFor(places, level, parent?.id ?? null, ready ? current : current);
+
+  async function saveName(name: string) {
+    if (!ready || (level !== "division" && !parent)) {
+      toast.error(level === "district" ? "Choose a division first" : "Choose a district first");
+      throw new Error("parent");
+    }
+    const { data, error } = await api.from("geo_places").insert({ level, name, parent_id: parent?.id ?? null });
+    if (error) {
+      toast.error(errorMessage(error));
+      throw error;
+    }
+    const row = (Array.isArray(data) ? data[0] : null) as GeoPlace | null;
+    if (row) {
+      qc.setQueryData<GeoPlace[]>(["geo-places"], (old) => [...(old ?? []).filter((item) => item.id !== row.id), row]);
+    } else {
+      await qc.invalidateQueries({ queryKey: ["geo-places"] });
+    }
+    if (level === "division") {
+      set("division", name);
+      set("district", "");
+      set("upazila", "");
+    } else if (level === "district") {
+      set("district", name);
+      set("upazila", "");
+    } else {
+      set("upazila", name);
+    }
+  }
+
+  return (
+    <Field label={label}>
+      <PlaceCombo
+        label={label}
+        value={current}
+        options={ready ? options : current ? [current] : []}
+        placeholder={
+          ready
+            ? `Choose ${label.toLowerCase()}, or type a new one`
+            : level === "district"
+              ? "Choose a division first"
+              : "Choose a district first"
+        }
+        disabled={!ready && !current}
+        onChange={(name) => {
+          if (level === "division") {
+            const next = places.find((place) => place.level === "division" && place.name.toLowerCase() === name.toLowerCase());
+            const still = places.some(
+              (place) => place.level === "district" && place.parent_id === next?.id && place.name.toLowerCase() === district.toLowerCase(),
+            );
+            set("division", name);
+            if (!still) {
+              set("district", "");
+              set("upazila", "");
+            }
+          } else if (level === "district") {
+            const next = places.find(
+              (place) => place.level === "district" && place.parent_id === divisionRow?.id && place.name.toLowerCase() === name.toLowerCase(),
+            );
+            const still = places.some(
+              (place) => place.level === "upazila" && place.parent_id === next?.id && place.name.toLowerCase() === upazila.toLowerCase(),
+            );
+            set("district", name);
+            if (!still) set("upazila", "");
+          } else {
+            set("upazila", name);
+          }
+        }}
+        onCreate={saveName}
+      />
+    </Field>
   );
 }

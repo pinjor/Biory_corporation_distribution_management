@@ -1,7 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api/client";
 import { PageHeader, Section, Field, Qty, EmptyState } from "@/components/app/page";
@@ -9,7 +8,7 @@ import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { myAvailableStockQuery, opt, optNum, productsQuery } from "@/lib/queries";
+import { myAvailableStockQuery, opt, productsQuery, salesOfficersQuery } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { errorMessage, todayBD } from "@/lib/format";
 
@@ -28,12 +27,34 @@ function NewVisit() {
   const search = Route.useSearch();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const canAssign = s.isSuper;
+  const [soId, setSoId] = useState(canAssign ? "" : s.userId);
   const { data: products = [] } = useQuery(productsQuery);
-  const { data: stock = [] } = useQuery(myAvailableStockQuery);
-  const { data: doctors = [] } = useQuery({
-    queryKey: ["doctors", "mine"],
+  const { data: officers = [] } = useQuery({ ...salesOfficersQuery, enabled: canAssign });
+  const { data: ownStock = [] } = useQuery({ ...myAvailableStockQuery, enabled: !canAssign });
+  const { data: assignedStock = [] } = useQuery({
+    queryKey: ["visit-stock", soId],
+    enabled: canAssign && !!soId,
     queryFn: async () => {
-      const { data, error } = await api.from("doctors").select("*").eq("assigned_so", s.userId).eq("status", "active").order("name");
+      const { data, error } = await api.from("v_stock").select("product_id, qty, days_to_expiry").eq("so_id", soId).gt("qty", 0);
+      if (error) throw error;
+      const totals = new Map<string, number>();
+      for (const row of data) {
+        if (!row.product_id) continue;
+        if (row.days_to_expiry != null && row.days_to_expiry <= 0) continue;
+        totals.set(row.product_id, (totals.get(row.product_id) ?? 0) + (row.qty ?? 0));
+      }
+      return [...totals.entries()].map(([product_id, on_hand]) => ({ product_id, on_hand }));
+    },
+  });
+  const stock = canAssign ? assignedStock : ownStock;
+  const { data: doctors = [] } = useQuery({
+    queryKey: ["doctors", "visit", soId],
+    enabled: !!soId,
+    queryFn: async () => {
+      let query = api.from("doctors").select("*").eq("status", "active").order("name");
+      if (!(canAssign && soId === s.userId && !s.isSO)) query = query.eq("assigned_so", soId);
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -44,7 +65,6 @@ function NewVisit() {
   const [end, setEnd] = useState("");
   const [purpose, setPurpose] = useState("Product detailing");
   const [notes, setNotes] = useState("");
-  const [geo, setGeo] = useState<{ lat: number; lng: number } | null>(null);
   const [qty, setQty] = useState<Record<string, number>>({});
   const [idem] = useState(() => crypto.randomUUID());
   const onHand = new Map(stock.map((r) => [r.product_id, r.on_hand]));
@@ -59,12 +79,13 @@ function NewVisit() {
         p_date: date,
         p_start: opt(start),
         p_end: opt(end),
-        p_lat: optNum(geo?.lat),
-        p_lng: optNum(geo?.lng),
+        p_lat: null,
+        p_lng: null,
         p_purpose: opt(purpose),
         p_notes: opt(notes),
         p_items: items.map(([product_id, q]) => ({ product_id, qty: q })),
         p_idempotency_key: idem,
+        p_so: canAssign ? soId : null,
       });
       if (error) throw error;
     },
@@ -77,26 +98,36 @@ function NewVisit() {
     onError: (e) => toast.error(errorMessage(e)),
   });
 
-  if (!s.isSO) return <PageHeader title="Log doctor visit" description="Only Sales Officers can log visits." />;
+  if (!s.isSO && !canAssign) return <PageHeader title="Log doctor visit" description="Sales Officers log their own visits. Super Admin can log one for any Sales Officer, or for himself." />;
 
   return (
     <div>
-      <PageHeader title="Log doctor visit" />
+      <PageHeader title="Log doctor visit" description={canAssign ? "Record this visit for a Sales Officer, or for yourself." : undefined} />
       <div className="grid gap-6 lg:grid-cols-2">
         <Section title="Visit">
-          {doctors.length === 0 ? (
-            <EmptyState title="No doctors assigned to you" action={<Button asChild size="sm"><Link to="/doctors">Add a doctor</Link></Button>} />
-          ) : (
             <div className="grid gap-4 sm:grid-cols-2">
+              {canAssign && (
+                <div className="sm:col-span-2">
+                  <Field label="Sales officer *">
+                    <NativeSelect value={soId} onChange={(e) => { setSoId(e.target.value); setDoctor(""); setQty({}); }}>
+                      <option value="">Choose Sales Officer…</option>
+                      <option value={s.userId}>Myself</option>
+                      {officers.filter((officer) => officer.id !== s.userId).map((officer) => (
+                        <option key={officer.id} value={officer.id}>{officer.full_name}{officer.so_code ? ` (${officer.so_code})` : ""}</option>
+                      ))}
+                    </NativeSelect>
+                  </Field>
+                </div>
+              )}
               <div className="sm:col-span-2">
-                <Field label="Doctor">
-                  <NativeSelect value={doctor} onChange={(e) => setDoctor(e.target.value)}>
-                    <option value="">Choose doctor…</option>
+                <Field label="Doctor *">
+                  <NativeSelect value={doctor} onChange={(e) => setDoctor(e.target.value)} disabled={!soId}>
+                    <option value="">{soId ? (doctors.length ? "Choose doctor…" : "No doctors for this officer") : "Choose a Sales Officer first"}</option>
                     {doctors.map((d) => <option key={d.id} value={d.id}>{d.name} · {d.speciality ?? ""} {d.chamber ? `· ${d.chamber}` : ""}</option>)}
                   </NativeSelect>
                 </Field>
               </div>
-              <Field label="Date"><Input type="date" max={todayBD()} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+              <Field label="Date *"><Input type="date" max={todayBD()} required value={date} onChange={(e) => setDate(e.target.value)} /></Field>
               <Field label="Purpose"><Input value={purpose} onChange={(e) => setPurpose(e.target.value)} /></Field>
               <Field label="Start time"><Input type="time" value={start} onChange={(e) => setStart(e.target.value)} /></Field>
               <Field label="End time">
@@ -108,26 +139,9 @@ function NewVisit() {
               <div className="sm:col-span-2">
                 <Field label="Notes"><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
               </div>
-              <div className="flex items-center gap-3 sm:col-span-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    navigator.geolocation?.getCurrentPosition(
-                      (p) => setGeo({ lat: Number(p.coords.latitude.toFixed(6)), lng: Number(p.coords.longitude.toFixed(6)) }),
-                      () => toast.error("Couldn't read your location"),
-                    )
-                  }
-                >
-                  <MapPin /> Capture location
-                </Button>
-                <span className="num text-xs text-muted-foreground">{geo ? `${geo.lat}, ${geo.lng}` : "Location not captured"}</span>
-              </div>
             </div>
-          )}
         </Section>
-        <Section title="Samples & gifts (from your promotional stock)">
+        <Section title={canAssign ? "Samples & gifts (from that officer's stock)" : "Samples & gifts (from your promotional stock)"}>
           {promos.length === 0 ? (
             <EmptyState title="No promotional products set up" />
           ) : (
@@ -166,7 +180,7 @@ function NewVisit() {
         </Section>
       </div>
       <div className="mt-6 flex justify-end">
-        <Button size="lg" onClick={() => m.mutate()} disabled={!doctor || over || m.isPending}>
+        <Button size="lg" onClick={() => m.mutate()} disabled={!soId || !doctor || !date || over || m.isPending}>
           {m.isPending ? "Saving…" : "Confirm visit"}
         </Button>
       </div>

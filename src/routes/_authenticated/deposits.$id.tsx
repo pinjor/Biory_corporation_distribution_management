@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { CheckCircle2, ExternalLink, Printer } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ExternalLink, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api/client";
 import { PageHeader, Section, StatusBadge, KeyValue, PageLoader, Money } from "@/components/app/page";
@@ -62,6 +62,9 @@ function DepositDetail() {
         title={<span className="num">{d.deposit_no}</span>}
         actions={
           <>
+            <Button asChild variant="outline">
+              <Link to="/deposits"><ArrowLeft /> Back</Link>
+            </Button>
             <StatusBadge status={d.status} />
             {d.attachment_path && <Button variant="outline" onClick={openProof}><ExternalLink /> View proof</Button>}
             {canReview && (

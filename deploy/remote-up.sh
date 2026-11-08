@@ -70,7 +70,8 @@ else
   FRESH=1
 fi
 
-# Copy the new code. Do not carry over a developer .env or replace the saved one.
+# Replace the old code. Files removed in this version must not stay behind and break the build.
+find "$APP_DIR" -mindepth 1 -maxdepth 1 ! -name '.env' -exec rm -rf {} +
 tar -C "$SRC" --exclude='./.env' -cf - . | tar -C "$APP_DIR" -xf -
 find "$APP_DIR" -name '*.sh' -exec sed -i 's/\r$//' {} +
 
@@ -136,11 +137,10 @@ HTTP_PORT="$(grep -E '^HTTP_PORT=' .env | cut -d= -f2- | tr -d '"')"
 echo "Building and starting BIORY on port ${HTTP_PORT}. Other projects stay as they are."
 docker compose up -d --build
 
-for sql in backend/sql/0[2-9]_*.sql; do
-  if [[ -f "$sql" ]]; then
-    echo "Updating the database from ${sql}."
-    docker compose exec -T postgres psql -U biory_owner -d biory -v ON_ERROR_STOP=1 < "$sql"
-  fi
+shopt -s nullglob
+for sql in backend/sql/0[2-9]_*.sql backend/sql/1[0-9]_*.sql; do
+  echo "Updating the database from ${sql}."
+  docker compose exec -T postgres psql -U biory_owner -d biory -v ON_ERROR_STOP=1 < "$sql"
 done
 
 echo "Waiting for the API..."

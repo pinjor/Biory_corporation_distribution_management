@@ -19,6 +19,8 @@ export interface SessionInfo {
   email: string;
   profile: Profile | null;
   roles: AppRole[];
+  /** Menu keys this person's roles may open. Missing means the built-in defaults. */
+  menus?: string[];
 }
 
 export function roleHelpers(roles: AppRole[]) {

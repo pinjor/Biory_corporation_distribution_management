@@ -1,7 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { FileText, HandCoins, Truck, Undo2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, Download, FileText, HandCoins, Pencil, Truck, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api/client";
 import { PageHeader, Section, StatusBadge, KeyValue, PageLoader, Money, Qty, Field, EmptyState } from "@/components/app/page";
@@ -17,8 +17,15 @@ import { ReasonDialog } from "@/components/app/reason-dialog";
 import { useSession } from "@/lib/session";
 import { round2 } from "@/lib/pricing";
 import { addDays, errorMessage, formatDate, formatDateTime, formatPct, todayBD } from "@/lib/format";
+import { downloadOrderReport, type OrderReport } from "@/lib/order-report";
 
 export const Route = createFileRoute("/_authenticated/orders/$id")({
+  validateSearch: (s: Record<string, unknown>): { report?: "1"; do?: "deliver" | "collect" } => {
+    const report = s["report"] === "1" ? ("1" as const) : undefined;
+    const raw = s["do"];
+    const action = raw === "deliver" || raw === "collect" ? raw : undefined;
+    return { ...(report ? { report } : {}), ...(action ? { do: action } : {}) };
+  },
   head: () => ({ meta: [{ title: "Order — BIORY Corporation" }] }),
   component: OrderDetail,
 });
@@ -43,10 +50,13 @@ type Order = NonNullable<ReturnType<typeof useOrder>["data"]>;
 
 function OrderDetail() {
   const { id } = Route.useParams();
+  const search = Route.useSearch();
+  const navigate = useNavigate();
   const s = useSession();
   const qc = useQueryClient();
   const { data: o, isLoading } = useOrder(id);
   const [dialog, setDialog] = useState<"deliver" | "collect" | "reject" | "cancel" | null>(null);
+  const handledSearch = useRef("");
   const [reverse, setReverse] = useState<string | null>(null);
 
   const refresh = () => {
@@ -64,6 +74,23 @@ function OrderDetail() {
     onError: (e) => toast.error(errorMessage(e)),
   });
 
+  useEffect(() => {
+    if (!o || (!search.report && !search.do)) return;
+    const key = `${o.id}:${search.report ?? ""}:${search.do ?? ""}`;
+    if (handledSearch.current === key) return;
+    handledSearch.current = key;
+    const mine = o.so_id === s.userId;
+    const remaining = o.order_items.reduce((a, i) => a + (i.qty - i.delivered_qty), 0);
+    if (search.report === "1") {
+      void downloadOrderReport(o as OrderReport).catch((e) => toast.error(errorMessage(e)));
+    }
+    if (search.do === "deliver" && (mine || (o.stock_from === "central" && s.isAdmin)) && o.status === "CONFIRMED" && remaining > 0) {
+      setDialog("deliver");
+    }
+    if (search.do === "collect" && mine && Number(o.due) > 0) setDialog("collect");
+    navigate({ to: "/orders/$id", params: { id }, search: {}, replace: true });
+  }, [o, search.report, search.do, id, navigate, s.userId, s.isAdmin]);
+
   if (isLoading || !o) return <PageLoader />;
   const mine = o.so_id === s.userId;
   const remaining = o.order_items.reduce((a, i) => a + (i.qty - i.delivered_qty), 0);
@@ -80,6 +107,17 @@ function OrderDetail() {
         description={`${o.chemists?.business_name ?? ""} · booked ${formatDate(o.order_date)} by ${o.profiles?.full_name ?? ""}`}
         actions={
           <>
+            <Button asChild variant="outline">
+              <Link to="/orders"><ArrowLeft /> Back</Link>
+            </Button>
+            {(mine || s.isSuper) && ["PENDING_APPROVAL", "CONFIRMED"].includes(o.status) && o.delivery_status === "NOT_DELIVERED" && (
+              <Button asChild variant="outline">
+                <Link to="/orders/new" search={{ edit: o.id }}><Pencil /> Edit</Link>
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => void downloadOrderReport(o as OrderReport).catch((e) => toast.error(errorMessage(e)))}>
+              <Download /> Order report
+            </Button>
             {s.isAdmin && o.status === "PENDING_APPROVAL" && !mine && (
               <>
                 <Button variant="outline" onClick={() => setDialog("reject")}>Reject</Button>

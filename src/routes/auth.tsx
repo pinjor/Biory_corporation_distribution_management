@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -22,7 +22,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { IconTip } from "@/components/ui/icon-tip";
 import { errorMessage } from "@/lib/format";
 import { clearOfflineCaches } from "@/lib/offline/session-cache";
 import {
@@ -68,12 +67,12 @@ function AuthPage() {
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
   const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState<Busy>(null);
   const [sent, setSent] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     setRemember(getRememberPreference());
@@ -102,12 +101,14 @@ function AuthPage() {
   function switchMode(next: Mode) {
     setMode(next);
     setSent(null);
+    setFormError(null);
     setShowPassword(false);
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy("form");
+    setFormError(null);
     try {
       if (mode === "signin") {
         setRememberPreference(remember, email.trim());
@@ -115,20 +116,7 @@ function AuthPage() {
         if (error) throw error;
         toast.success("Welcome back");
       } else if (mode === "signup") {
-        setRememberPreference(remember, email.trim());
-        const { data, error } = await api.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            emailRedirectTo: window.location.origin + "/dashboard",
-            data: { full_name: fullName },
-          },
-        });
-        if (error) throw error;
-        if (!data.session)
-          setSent(
-            "Check your email and click the confirmation link to finish creating your account.",
-          );
+        return;
       } else {
         const { error } = await api.auth.resetPasswordForEmail(email.trim(), {
           redirectTo: `${window.location.origin}/reset-password`,
@@ -137,7 +125,9 @@ function AuthPage() {
         setSent("If that email has an account, a password reset link is on its way.");
       }
     } catch (err) {
-      toast.error(errorMessage(err));
+      const message = errorMessage(err);
+      setFormError(message);
+      toast.error(message);
     } finally {
       setBusy(null);
     }
@@ -151,11 +141,11 @@ function AuthPage() {
     mode === "signin"
       ? "Welcome back"
       : mode === "signup"
-        ? "Create your account"
+        ? "Contact your admin"
         : "Reset your password";
   const subtitle =
     mode === "signup"
-      ? "New accounts get access once a Super Admin assigns your role."
+      ? "A Super Admin creates every account. Public sign-up is closed."
       : mode === "forgot"
         ? "Enter your work email and we'll send you a secure reset link."
         : "Sign in to your BIORY Corporation workspace.";
@@ -216,20 +206,25 @@ function AuthPage() {
                 </span>
                 <p className="mt-3 text-sm text-accent-foreground">{sent}</p>
               </div>
+            ) : mode === "signup" ? (
+              <div className="mt-6 rounded-2xl border bg-primary-soft p-6 text-center animate-in fade-in zoom-in-95">
+                <span className="mx-auto grid size-12 place-items-center rounded-full bg-card shadow-card">
+                  <UserRound className="size-6 text-primary" />
+                </span>
+                <h2 className="mt-3 text-base font-semibold text-foreground">Accounts are created by an admin</h2>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  Ask your Super Admin to add you from the Users page. They will give you an email and password. Then come back here and sign in.
+                </p>
+                <Button type="button" className="mt-5 h-11 rounded-xl" onClick={() => switchMode("signin")}>
+                  <ArrowLeft /> Back to sign in
+                </Button>
+              </div>
             ) : (
               <form onSubmit={submit} className="mt-6 flex flex-col gap-4" noValidate={false}>
-                {mode === "signup" && (
-                  <AuthField label="Full name" htmlFor="full-name">
-                    <IconInput
-                      id="full-name"
-                      icon={<UserRound />}
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="Your full name"
-                      required
-                      autoComplete="name"
-                    />
-                  </AuthField>
+                {formError && (
+                  <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive-soft px-3 py-2.5 text-sm text-destructive">
+                    {formError}
+                  </div>
                 )}
                 <AuthField label="Email address" htmlFor="email">
                   <IconInput
@@ -271,24 +266,23 @@ function AuthPage() {
                         onKeyUp={trackCaps}
                         onKeyDown={trackCaps}
                         onBlur={() => setCapsLock(false)}
-                        placeholder={
-                          mode === "signup" ? "At least 8 characters" : "Enter your password"
-                        }
+                        placeholder="Enter your password"
                         required
                         minLength={8}
                         className="pr-11"
-                        autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                        autoComplete="current-password"
                       />
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={() => setShowPassword((v) => !v)}
                         aria-label={showPassword ? "Hide password" : "Show password"}
                         aria-pressed={showPassword}
-                        className="absolute right-1.5 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="absolute right-1.5 top-1/2 size-8 -translate-y-1/2 text-muted-foreground hover:bg-muted"
                       >
                         {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                        <IconTip label={showPassword ? "Hide password" : "Show password"} />
-                      </button>
+                      </Button>
                     </div>
                     {capsLock && (
                       <p className="mt-1.5 text-xs font-medium text-warning-foreground">
@@ -297,7 +291,6 @@ function AuthPage() {
                         </span>
                       </p>
                     )}
-                    {mode === "signup" && <PasswordStrength password={password} />}
                   </AuthField>
                 )}
 
@@ -323,11 +316,7 @@ function AuthPage() {
                     </>
                   ) : (
                     <>
-                      {mode === "signin"
-                        ? "Sign in"
-                        : mode === "signup"
-                          ? "Create account"
-                          : "Send reset link"}
+                      {mode === "signin" ? "Sign in" : "Send reset link"}
                       <ArrowRight className="transition-transform group-hover:translate-x-0.5" />
                     </>
                   )}
@@ -474,34 +463,3 @@ function IconInput({
   );
 }
 
-function PasswordStrength({ password }: { password: string }) {
-  const score = useMemo(() => {
-    let s = 0;
-    if (password.length >= 8) s++;
-    if (password.length >= 12) s++;
-    if (/[A-Z]/.test(password) && /[a-z]/.test(password)) s++;
-    if (/\d/.test(password) && /[^A-Za-z0-9]/.test(password)) s++;
-    return s;
-  }, [password]);
-  if (!password) return null;
-  const labels = ["Too weak", "Weak", "Fair", "Good", "Strong"];
-  const colors = ["bg-destructive", "bg-destructive", "bg-warning", "bg-success", "bg-success"];
-  return (
-    <div className="mt-2">
-      <div className="grid grid-cols-4 gap-1.5">
-        {[0, 1, 2, 3].map((i) => (
-          <span
-            key={i}
-            className={cn(
-              "h-1.5 rounded-full transition-colors",
-              i < score ? colors[score] : "bg-muted",
-            )}
-          />
-        ))}
-      </div>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Password strength: <span className="font-medium text-foreground">{labels[score]}</span>
-      </p>
-    </div>
-  );
-}

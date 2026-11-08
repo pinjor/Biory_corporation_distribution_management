@@ -48,13 +48,9 @@ export function Section({
   return (
     <section className={cn("surface-card overflow-hidden", className)}>
       {(title || actions) && (
-        <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5 border-b px-4 py-3 sm:px-5">
-          <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-          {actions && (
-            <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2 max-sm:w-full max-sm:[&>div]:w-full max-sm:[&>div]:flex-wrap max-sm:[&_input]:w-full max-sm:[&_input]:basis-full max-sm:[&_select]:w-auto max-sm:[&_select]:flex-1">
-              {actions}
-            </div>
-          )}
+        <header className="flex flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+          {title ? <h2 className="shrink-0 text-base font-semibold text-foreground">{title}</h2> : null}
+          {actions ? <div className="min-w-0">{actions}</div> : null}
         </header>
       )}
       <div className={cn("p-4 sm:p-5", bodyClassName)}>{children}</div>
@@ -68,12 +64,18 @@ export function StatCard({
   hint,
   tone = "default",
   icon,
+  onClick,
+  active,
+  className,
 }: {
   label: string;
   value: ReactNode;
   hint?: ReactNode;
   tone?: "default" | "success" | "warning" | "destructive" | "info";
   icon?: ReactNode;
+  onClick?: () => void;
+  active?: boolean;
+  className?: string;
 }) {
   const toneCls = {
     default: "text-primary bg-primary-soft",
@@ -82,8 +84,14 @@ export function StatCard({
     destructive: "text-destructive bg-destructive-soft",
     info: "text-info bg-info-soft",
   }[tone];
-  return (
-    <div className="surface-card flex flex-col gap-2 p-4">
+  const cls = cn(
+    "surface-card flex flex-col gap-2 p-4 text-left",
+    onClick && "cursor-pointer transition hover:border-primary/40",
+    active && "ring-2 ring-primary",
+    className,
+  );
+  const body = (
+    <>
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {label}
@@ -96,7 +104,13 @@ export function StatCard({
       </div>
       <div className="num text-2xl font-semibold text-foreground">{value}</div>
       {hint && <div className="text-xs text-muted-foreground">{hint}</div>}
-    </div>
+    </>
+  );
+  if (!onClick) return <div className={cls}>{body}</div>;
+  return (
+    <button type="button" className={cls} onClick={onClick} aria-pressed={!!active}>
+      {body}
+    </button>
   );
 }
 
@@ -148,6 +162,11 @@ const STATUS_VARIANTS: Record<string, BadgeProps["variant"]> = {
   VALID: "success",
   REVERSED: "muted",
   FULL: "success",
+  HALF: "warning",
+  SHORT: "warning",
+  ON_DUTY: "info",
+  MISSED: "destructive",
+  ABSENT: "muted",
   PARTIAL: "warning",
   active: "success",
   inactive: "muted",

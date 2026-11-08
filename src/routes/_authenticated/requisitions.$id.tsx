@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { ArrowLeft, Download } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -26,6 +27,7 @@ import {
 import { useSession } from "@/lib/session";
 import { errorMessage, formatDateTime } from "@/lib/format";
 import { locationsQuery } from "@/lib/queries";
+import { downloadIssueReport, downloadReceiveReport } from "@/lib/issue-report";
 
 export const Route = createFileRoute("/_authenticated/requisitions/$id")({
   head: () => ({ meta: [{ title: "Requisition — BIORY Corporation" }] }),
@@ -123,7 +125,7 @@ function RequisitionDetail() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Issued. Company stock is down until the chemist or doctor confirms receipt.");
+      toast.success("Issued from company stock. The Sales Officer confirms receipt to add it to their stock.");
       refresh();
     },
     onError: (e) => toast.error(errorMessage(e)),
@@ -135,7 +137,7 @@ function RequisitionDetail() {
     },
     onSuccess: () => {
       toast.success(
-        r?.party_kind === "doctor" ? "Doctor received the stock" : r?.party_kind === "chemist" ? "Chemist shop received the stock" : "Receipt confirmed",
+        "Received into Sales Officer stock",
       );
       refresh();
     },
@@ -186,6 +188,19 @@ function RequisitionDetail() {
         title={<span className="num">{r.req_no}</span>}
         actions={
           <>
+            <Button asChild variant="outline">
+              <Link to="/requisitions"><ArrowLeft /> Back</Link>
+            </Button>
+            {["ISSUED", "RECEIVED"].includes(r.status) && (
+              <Button variant="outline" onClick={() => void downloadIssueReport(r.id).catch((e) => toast.error(errorMessage(e)))}>
+                <Download /> Issue report
+              </Button>
+            )}
+            {r.status === "RECEIVED" && (
+              <Button variant="outline" onClick={() => void downloadReceiveReport(r.id).catch((e) => toast.error(errorMessage(e)))}>
+                <Download /> Receive report
+              </Button>
+            )}
             <StatusBadge status={r.status} />
             {canCancel && (
               <Button variant="outline" onClick={() => cancel.mutate()} disabled={cancel.isPending}>
@@ -203,7 +218,7 @@ function RequisitionDetail() {
                 onClick={() => receive.mutate()}
                 disabled={receive.isPending}
               >
-                {r.party_kind === "doctor" ? "Confirm doctor received" : r.party_kind === "chemist" ? "Confirm chemist received" : "Confirm received"}
+                Confirm received
               </Button>
             )}
           </>

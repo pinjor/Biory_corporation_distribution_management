@@ -1,15 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Paperclip, Plus } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ClipboardList, Eye, Paperclip, Plus, Tag, Users } from "lucide-react";
 import { api } from "@/lib/api/client";
+import { ListPager, usePagedRows } from "@/components/app/list-pager";
+import { FilterClear, ListToolbar, useListRange } from "@/components/app/list-toolbar";
 import { PageHeader, Section, StatusBadge, EmptyState, Money } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { masterValuesQuery } from "@/lib/queries";
 import { useSession } from "@/lib/session";
-import { formatDate } from "@/lib/format";
-import { downloadCsv } from "@/lib/csv";
+import { formatDate, inDateRange } from "@/lib/format";
 import { categoryLabel, EXPENSE_CATEGORIES } from "@/lib/expenses";
 
 export const Route = createFileRoute("/_authenticated/expenses/")({
@@ -19,9 +21,16 @@ export const Route = createFileRoute("/_authenticated/expenses/")({
 
 function ExpensesPage() {
   const s = useSession();
+  const { data: masters = [] } = useQuery(masterValuesQuery);
+  const categories = masters.filter((row) => row.kind === "expense_category" && row.active && row.code);
+  const categoryOptions = categories.length
+    ? categories.map((row) => ({ value: row.code as string, label: row.name }))
+    : EXPENSE_CATEGORIES.map((row) => ({ value: row.value, label: row.label }));
+  const [q, setQ] = useState("");
   const [status, setStatus] = useState(s.isFinance ? "SUBMITTED" : "");
   const [scope, setScope] = useState<"all" | "mine">(s.isFinance ? "all" : "mine");
   const [category, setCategory] = useState("");
+  const { from, to, setFrom, setTo, reset } = useListRange();
   const { data = [], isLoading } = useQuery({
     queryKey: ["expenses", status, scope, category],
     queryFn: async () => {
@@ -38,7 +47,13 @@ function ExpensesPage() {
       return data;
     },
   });
-  const total = data.reduce((a, d) => a + Number(d.amount), 0);
+  const rows = useMemo(() => data.filter((d) => {
+    if (!inDateRange(d.expense_date, from, to)) return false;
+    const hay = `${d.expense_no} ${d.description ?? ""} ${d.profiles?.full_name ?? ""} ${categoryLabel(d.category, masters)}`.toLowerCase();
+    return !q || hay.includes(q.toLowerCase());
+  }), [data, q, masters, from, to]);
+  const total = rows.reduce((a, d) => a + Number(d.amount), 0);
+  const page = usePagedRows(rows, `${q}|${status}|${scope}|${category}|${from}|${to}`);
   const showWho = s.isFinance && scope === "all";
 
   return (
@@ -52,28 +67,6 @@ function ExpensesPage() {
         }
         actions={
           <>
-            <Button
-              variant="outline"
-              onClick={() =>
-                downloadCsv("expenses.csv", [
-                  ["expense_no", "date", "submitted_by", "category", "description", "amount", "receipts", "status", "reviewed_at", "review_note"],
-                  ...data.map((d) => [
-                    d.expense_no,
-                    d.expense_date,
-                    d.profiles?.full_name,
-                    d.category,
-                    d.description,
-                    d.amount,
-                    d.receipt_paths.length,
-                    d.status,
-                    d.reviewed_at,
-                    d.review_note,
-                  ]),
-                ])
-              }
-            >
-              Export CSV
-            </Button>
             <Button asChild variant="highlight">
               <Link to="/expenses/new">
                 <Plus /> New expense
@@ -86,38 +79,39 @@ function ExpensesPage() {
         bodyClassName="p-0"
         title={
           <span>
-            {data.length} expenses · <Money value={total} />
+            {rows.length} expenses · <Money value={total} />
           </span>
         }
         actions={
-          <div className="flex flex-wrap gap-2">
+          <ListToolbar query={q} onQuery={setQ} placeholder="Expense / details…" from={from} to={to} onFrom={setFrom} onTo={setTo}>
             {s.isFinance && (
-              <NativeSelect value={scope} onChange={(e) => setScope(e.target.value as "all" | "mine")} className="h-8 w-32">
+              <NativeSelect leading={<Users />} value={scope} onChange={(e) => setScope(e.target.value as "all" | "mine")} className="h-9 w-36 shrink-0" aria-label="Scope">
                 <option value="all">Everyone</option>
                 <option value="mine">Mine</option>
               </NativeSelect>
             )}
-            <NativeSelect value={category} onChange={(e) => setCategory(e.target.value)} className="h-8 w-40">
+            <NativeSelect leading={<Tag />} value={category} onChange={(e) => setCategory(e.target.value)} className="h-9 w-40 shrink-0" aria-label="Category">
               <option value="">All categories</option>
-              {EXPENSE_CATEGORIES.map((c) => (
+              {categoryOptions.map((c) => (
                 <option key={c.value} value={c.value}>
                   {c.label}
                 </option>
               ))}
             </NativeSelect>
-            <NativeSelect value={status} onChange={(e) => setStatus(e.target.value)} className="h-8 w-36">
+            <NativeSelect leading={<ClipboardList />} value={status} onChange={(e) => setStatus(e.target.value)} className="h-9 w-40 shrink-0" aria-label="Status">
               <option value="">All statuses</option>
               <option value="SUBMITTED">Pending review</option>
               <option value="APPROVED">Approved</option>
               <option value="REJECTED">Rejected</option>
               <option value="CANCELLED">Withdrawn</option>
             </NativeSelect>
-          </div>
+            <FilterClear onClick={() => { setQ(""); setCategory(""); setStatus(s.isFinance ? "SUBMITTED" : ""); setScope(s.isFinance ? "all" : "mine"); reset(); }} />
+          </ListToolbar>
         }
       >
         {isLoading ? (
           <div className="p-6 text-sm text-muted-foreground">Loading…</div>
-        ) : data.length === 0 ? (
+        ) : rows.length === 0 ? (
           <div className="p-5">
             <EmptyState
               title="No expenses here"
@@ -129,6 +123,7 @@ function ExpensesPage() {
             />
           </div>
         ) : (
+          <>
           <Table>
             <TableHeader>
               <TableRow>
@@ -137,10 +132,11 @@ function ExpensesPage() {
                 <TableHead>Details</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((d) => (
+              {page.pageRows.map((d) => (
                 <TableRow key={d.id}>
                   <TableCell>
                     <Link to="/expenses/$id" params={{ id: d.id }} className="num font-medium text-primary hover:underline">
@@ -154,7 +150,7 @@ function ExpensesPage() {
                     </TableCell>
                   )}
                   <TableCell className="max-w-xs text-sm">
-                    <div className="font-medium">{categoryLabel(d.category)}</div>
+                    <div className="font-medium">{categoryLabel(d.category, masters)}</div>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       {d.receipt_paths.length > 0 ? (
                         <span className="inline-flex items-center gap-0.5">
@@ -173,10 +169,17 @@ function ExpensesPage() {
                   <TableCell className="text-right font-semibold">
                     <Money value={d.amount} />
                   </TableCell>
+                  <TableCell className="text-right">
+                    <Button asChild size="icon" variant="ghost" aria-label={`View ${d.expense_no}`} className="size-8">
+                      <Link to="/expenses/$id" params={{ id: d.id }}><Eye /></Link>
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+          <ListPager page={page.page} pages={page.pages} total={page.total} pageSize={page.pageSize} noun="expenses" onPage={page.setPage} onSize={page.setPageSize} />
+          </>
         )}
       </Section>
     </div>

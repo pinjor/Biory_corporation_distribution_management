@@ -1,13 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { CheckCircle2, ExternalLink, FileText, Undo2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ExternalLink, FileText, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api/client";
 import { PageHeader, Section, StatusBadge, KeyValue, PageLoader, Money, EmptyState } from "@/components/app/page";
 import { ReasonDialog } from "@/components/app/reason-dialog";
 import { Button } from "@/components/ui/button";
-import { profilesQuery } from "@/lib/queries";
+import { masterValuesQuery, profilesQuery } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { errorMessage, formatDate, formatDateTime } from "@/lib/format";
 import { categoryLabel } from "@/lib/expenses";
@@ -18,6 +18,7 @@ export const Route = createFileRoute("/_authenticated/expenses/$id")({
 });
 
 function ExpenseDetail() {
+  const { data: masters = [] } = useQuery(masterValuesQuery);
   const { id } = Route.useParams();
   const s = useSession();
   const qc = useQueryClient();
@@ -85,6 +86,9 @@ function ExpenseDetail() {
         title={<span className="num">{e.expense_no}</span>}
         actions={
           <>
+            <Button asChild variant="outline">
+              <Link to="/expenses"><ArrowLeft /> Back</Link>
+            </Button>
             <StatusBadge status={e.status} label={e.status === "SUBMITTED" ? "pending review" : e.status === "CANCELLED" ? "withdrawn" : undefined} />
             {mine && e.status === "SUBMITTED" && (
               <Button
@@ -125,7 +129,7 @@ function ExpenseDetail() {
           <KeyValue
             items={[
               ["Submitted by", `${e.profiles?.full_name || e.profiles?.email || ""}${e.profiles?.so_code ? ` (${e.profiles.so_code})` : ""}`],
-              ["Category", categoryLabel(e.category)],
+              ["Category", categoryLabel(e.category, masters)],
               ["Date spent", formatDate(e.expense_date)],
               ["Submitted", formatDateTime(e.created_at)],
               ["Reviewed", e.reviewed_at ? `${formatDateTime(e.reviewed_at)} by ${reviewer?.full_name ?? ""}` : "—"],

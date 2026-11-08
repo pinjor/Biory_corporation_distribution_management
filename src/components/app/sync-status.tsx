@@ -32,7 +32,7 @@ export function SyncStatusChip() {
           <span className="num sm:hidden">{pendingCount + failedCount || ""}</span>
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0">
+      <PopoverContent align="end" className="w-[min(20rem,calc(100vw-1rem))] p-0">
         <QueuedOrdersList compact />
         <div className="flex items-center justify-between gap-2 border-t px-3 py-2 text-xs text-muted-foreground">
           <span>{!online ? "Orders sync automatically when you're back online." : lastSyncError ?? "Synced automatically in the background."}</span>

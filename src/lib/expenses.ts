@@ -11,7 +11,8 @@ export const EXPENSE_CATEGORIES = [
 
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number]["value"];
 
-export const categoryLabel = (v: string) => EXPENSE_CATEGORIES.find((c) => c.value === v)?.label ?? v;
+export const categoryLabel = (v: string, rows?: { code: string | null; name: string }[]) =>
+  rows?.find((row) => row.code === v)?.name ?? EXPENSE_CATEGORIES.find((c) => c.value === v)?.label ?? v;
 
 export const RECEIPT_MAX_FILES = 5;
 export const RECEIPT_MAX_BYTES = 5 * 1024 * 1024;

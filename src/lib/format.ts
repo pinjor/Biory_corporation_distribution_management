@@ -61,6 +61,23 @@ export function todayBD(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: TZ });
 }
 
+/** Calendar day in Dhaka for a date or timestamp. */
+export function dayBD(value: string | null | undefined): string {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  return new Date(value).toLocaleDateString("en-CA", { timeZone: TZ });
+}
+
+/** True when the value's Dhaka day falls inside from/to. Blank ends are open. */
+export function inDateRange(value: string | null | undefined, from: string, to: string): boolean {
+  if (!from && !to) return true;
+  const day = dayBD(value);
+  if (!day) return false;
+  if (from && day < from) return false;
+  if (to && day > to) return false;
+  return true;
+}
+
 export function addDays(iso: string, days: number): string {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);

@@ -13,7 +13,7 @@ from app.errors import ApiError
 from app.query.parser import IDENT, Embed, Selection, parse_selection
 
 HIDDEN_TABLES = frozenset({"users", "doc_counters", "so_credentials"})
-WRITABLE_TABLES = frozenset({"products", "chemists", "doctors", "app_settings", "notifications"})
+WRITABLE_TABLES = frozenset({"products", "chemists", "doctors", "app_settings", "notifications", "master_values", "territories", "geo_places"})
 MAX_LIMIT = 5000
 OPS = frozenset({"eq", "neq", "gt", "gte", "lt", "lte", "in", "is", "like", "ilike"})
 OP_SQL = {"eq": "=", "neq": "<>", "gt": ">", "gte": ">=", "lt": "<", "lte": "<="}
@@ -130,7 +130,10 @@ async def load_catalog(conn: asyncpg.Connection) -> Catalog:
         where n.nspname = 'public' and c.relkind in ('r', 'v')
         """
     ):
-        tables[row["name"]] = Table(name=row["name"], kind=row["relkind"])
+        kind = row["relkind"]
+        if isinstance(kind, bytes):
+            kind = kind.decode()
+        tables[row["name"]] = Table(name=row["name"], kind=kind)
 
     for row in await conn.fetch(
         """
@@ -487,6 +490,14 @@ async def write_rows(
     table = catalog.table(table_name)
     if table_name not in WRITABLE_TABLES or table.kind != "r":
         raise ApiError("This table cannot be changed from the API", 403, "read_only")
+    if op == "delete":
+        if not filters:
+            raise ApiError("Refusing to delete every row", 400)
+        binder = Binder()
+        where = _where(catalog, table, filters, [], binder)
+        sql = f"delete from public.{quote(table.name)} t where {where} returning *"
+        records = await conn.fetch(sql, *binder.params)
+        return [dict(record) for record in records]
     if not values:
         raise ApiError("Nothing to save", 400)
     clean: dict[str, Any] = {}

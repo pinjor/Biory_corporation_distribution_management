@@ -3,7 +3,6 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
-import { IconTip } from "@/components/ui/icon-tip";
 
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
@@ -41,49 +40,67 @@ export interface ButtonProps
   asChild?: boolean;
 }
 
-function iconTipLabel(aria: unknown, children: React.ReactNode): string | undefined {
-  if (typeof aria === "string" && aria.trim()) return aria.trim();
-  let found: string | undefined;
-  React.Children.forEach(children, (child) => {
-    if (!React.isValidElement<{ className?: string; children?: React.ReactNode }>(child)) return;
-    const className = child.props.className;
-    const text = child.props.children;
-    if (typeof className === "string" && className.includes("sr-only") && typeof text === "string" && text.trim()) {
-      found = text.trim();
-    }
-  });
-  return found;
+let iconTip: HTMLDivElement | null = null;
+let iconTipScrollBound = false;
+
+function placeIconTip(text: string, anchor: HTMLElement) {
+  if (typeof document === "undefined") return;
+  if (!iconTip || !iconTip.isConnected) {
+    iconTip = document.createElement("div");
+    iconTip.setAttribute("role", "tooltip");
+    iconTip.className =
+      "pointer-events-none fixed z-[80] whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs font-medium text-background shadow-md";
+    document.body.appendChild(iconTip);
+  }
+  if (!iconTipScrollBound) {
+    iconTipScrollBound = true;
+    window.addEventListener("scroll", hideIconTip, true);
+    window.addEventListener("resize", hideIconTip);
+  }
+  const rect = anchor.getBoundingClientRect();
+  const below = rect.top < 40;
+  iconTip.textContent = text;
+  iconTip.style.left = `${rect.left + rect.width / 2}px`;
+  iconTip.style.top = below ? `${rect.bottom + 6}px` : `${rect.top - 6}px`;
+  iconTip.style.transform = below ? "translate(-50%, 0)" : "translate(-50%, -100%)";
+  iconTip.hidden = false;
 }
 
-function hasVisibleLabel(children: React.ReactNode): boolean {
-  let visible = false;
-  React.Children.forEach(children, (child) => {
-    if (typeof child === "string" && child.trim()) visible = true;
-    if (typeof child === "number") visible = true;
-    if (!React.isValidElement<{ className?: string; children?: React.ReactNode }>(child)) return;
-    const className = child.props.className;
-    if (typeof className === "string" && className.includes("sr-only")) return;
-    const text = child.props.children;
-    if (typeof text === "string" && text.trim()) visible = true;
-    if (typeof text === "number") visible = true;
-  });
-  return visible;
+function hideIconTip() {
+  if (iconTip) iconTip.hidden = true;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, children, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, title, onPointerEnter, onPointerLeave, onFocus, onBlur, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
-    const named = props["data-day"] == null ? iconTipLabel(props["aria-label"], children) : undefined;
-    const label = named && (size === "icon" || !hasVisibleLabel(children)) ? named : undefined;
-    const tip = label ? <IconTip label={label} /> : null;
-    const content =
-      asChild && tip && React.isValidElement<{ children?: React.ReactNode }>(children)
-        ? React.cloneElement(children, {}, children.props.children, tip)
-        : children;
+    const ariaLabel = props["aria-label"];
+    const tip =
+      size === "icon"
+        ? (typeof title === "string" && title) || (typeof ariaLabel === "string" ? ariaLabel : "")
+        : "";
     return (
-      <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props}>
-        {asChild ? content : <>{children}{tip}</>}
-      </Comp>
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        {...props}
+        title={tip ? undefined : title}
+        onPointerEnter={(event: React.PointerEvent<HTMLButtonElement>) => {
+          onPointerEnter?.(event);
+          if (tip) placeIconTip(tip, event.currentTarget);
+        }}
+        onPointerLeave={(event: React.PointerEvent<HTMLButtonElement>) => {
+          onPointerLeave?.(event);
+          if (tip) hideIconTip();
+        }}
+        onFocus={(event: React.FocusEvent<HTMLButtonElement>) => {
+          onFocus?.(event);
+          if (tip) placeIconTip(tip, event.currentTarget);
+        }}
+        onBlur={(event: React.FocusEvent<HTMLButtonElement>) => {
+          onBlur?.(event);
+          if (tip) hideIconTip();
+        }}
+      />
     );
   },
 );

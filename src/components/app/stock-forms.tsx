@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { Download, FileUp } from "lucide-react";
+import { useMemo, useState, type ComponentType } from "react";
+import { ArrowLeftRight, MapPin, Package, PackageOpen, Pill, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api/client";
+import { ListPager, usePagedRows } from "@/components/app/list-pager";
+import { FilterClear, ListToolbar, useListRange } from "@/components/app/list-toolbar";
 import { Section, Field, Qty, EmptyState } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
@@ -16,15 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { locationsQuery, opt, productsQuery, profilesQuery } from "@/lib/queries";
-import { errorMessage, formatDate, formatDateTime, humanize, todayBD } from "@/lib/format";
-import {
-  downloadCsv,
-  OPENING_STOCK_HEADERS,
-  parseCsv,
-  validateOpeningStock,
-  type OpeningRow,
-  type RowIssue,
-} from "@/lib/csv";
+import { errorMessage, formatDate, formatDateTime, humanize, inDateRange, todayBD } from "@/lib/format";
 
 /** Shared stock-entry building blocks for Receive stock, Opening stock and Stock adjustment. */
 
@@ -146,203 +140,98 @@ export function BatchReceiptForm({ type }: { type: "PURCHASE_RECEIPT" | "OPENING
   );
 }
 
-export function OpeningStockImport() {
-  const qc = useQueryClient();
-  const { data: products = [] } = useQuery(productsQuery);
-  const [result, setResult] = useState<{
-    rows: OpeningRow[];
-    issues: RowIssue[];
-    file: string;
-  } | null>(null);
-  const m = useMutation({
-    mutationFn: async () => {
-      if (!result) return 0;
-      const { data, error } = await api.rpc("import_opening_stock", {
-        p_rows: result.rows.map((r) => ({
-          product_code: r.product_code,
-          batch_no: r.batch_no,
-          mfg_date: r.mfg_date,
-          expiry_date: r.expiry_date,
-          qty: r.qty,
-          remarks: r.remarks,
-        })),
-      });
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (n) => {
-      toast.success(`Imported ${n} batches`);
-      qc.invalidateQueries({ queryKey: ["stock"] });
-      qc.invalidateQueries({ queryKey: ["movements"] });
-      setResult(null);
-    },
-    onError: (e) => toast.error(errorMessage(e)),
-  });
-
-  async function onFile(file: File) {
-    const text = await file.text();
-    const map = new Map(products.map((p) => [p.code, p.name]));
-    const v = validateOpeningStock(parseCsv(text), map, todayBD());
-    setResult({ ...v, file: file.name });
-  }
-
-  return (
-    <div className="flex flex-col gap-6">
-      <Section title="1 · Upload">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          <label className="flex flex-1 cursor-pointer items-center gap-3 rounded-xl border border-dashed p-5 hover:bg-muted">
-            <FileUp className="size-6 text-primary" />
-            <div>
-              <div className="text-sm font-semibold">
-                {result ? result.file : "Choose a CSV file"}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Columns: {OPENING_STOCK_HEADERS.join(", ")} · dates as YYYY-MM-DD
-              </div>
-            </div>
-            <input
-              type="file"
-              accept=".csv,text/csv"
-              className="sr-only"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) onFile(f);
-                e.target.value = "";
-              }}
-            />
-          </label>
-          <Button
-            variant="outline"
-            onClick={() =>
-              downloadCsv("opening-stock-template.csv", [
-                [...OPENING_STOCK_HEADERS],
-                [
-                  products[0]?.code ?? "NAP500",
-                  "B-0001",
-                  "2026-01-01",
-                  "2028-01-01",
-                  "100",
-                  "Rack A1",
-                ],
-              ])
-            }
-          >
-            <Download /> Template
-          </Button>
-        </div>
-      </Section>
-
-      {result && (
-        <>
-          <Section
-            title={`2 · Validate — ${result.rows.length} valid, ${result.issues.length} with problems`}
-          >
-            {result.issues.length > 0 ? (
-              <ul className="flex max-h-60 flex-col gap-1 overflow-y-auto text-sm">
-                {result.issues.map((i) => (
-                  <li
-                    key={i.line}
-                    className="rounded-md bg-destructive-soft px-3 py-1.5 text-destructive"
-                  >
-                    Line {i.line}: {i.message}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-success">Every row passed validation.</p>
-            )}
-            {result.issues.length > 0 && (
-              <p className="mt-3 text-xs text-muted-foreground">
-                Fix the file and upload again — the import only runs when every row is valid.
-              </p>
-            )}
-          </Section>
-          <Section title="3 · Preview" bodyClassName="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Line</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Batch</TableHead>
-                  <TableHead>Mfg</TableHead>
-                  <TableHead>Expiry</TableHead>
-                  <TableHead className="text-right">Qty</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {result.rows.slice(0, 200).map((r) => (
-                  <TableRow key={r.line}>
-                    <TableCell className="num text-xs">{r.line}</TableCell>
-                    <TableCell>
-                      {r.product_name}{" "}
-                      <span className="num text-xs text-muted-foreground">{r.product_code}</span>
-                    </TableCell>
-                    <TableCell className="num text-xs">{r.batch_no}</TableCell>
-                    <TableCell className="text-xs">{formatDate(r.mfg_date || null)}</TableCell>
-                    <TableCell className="text-xs">{formatDate(r.expiry_date)}</TableCell>
-                    <TableCell className="text-right">
-                      <Qty value={r.qty} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Section>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setResult(null)}>
-              Discard
-            </Button>
-            <Button
-              disabled={result.issues.length > 0 || result.rows.length === 0 || m.isPending}
-              onClick={() => m.mutate()}
-            >
-              {m.isPending ? "Importing…" : `4 · Confirm import of ${result.rows.length} batches`}
-            </Button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 /** Latest ledger entries of the given movement types (read-only). */
 export function RecentMovements({
-  title,
+  noun,
   types,
   empty,
 }: {
-  title: string;
+  noun: string;
   types: string[];
   empty: string;
 }) {
   const { data: products = [] } = useQuery(productsQuery);
   const { data: locations = [] } = useQuery(locationsQuery);
   const { data: profiles = [] } = useQuery(profilesQuery);
+  const [q, setQ] = useState("");
+  const [product, setProduct] = useState("");
+  const [loc, setLoc] = useState("");
+  const [type, setType] = useState("");
+  const { from, to, setFrom, setTo, reset } = useListRange();
   const pmap = new Map(products.map((p) => [p.id, p]));
   const lmap = new Map(locations.map((l) => [l.id, l.name]));
   const umap = new Map(profiles.map((p) => [p.id, p.full_name]));
   const { data = [], isLoading } = useQuery({
-    queryKey: ["movements", types.join(",")],
+    queryKey: ["movements", types.join(","), from, to],
     queryFn: async () => {
-      const { data, error } = await api
+      let query = api
         .from("stock_movements")
         .select("*, batches(batch_no, expiry_date)")
         .in("movement_type", types)
         .order("performed_at", { ascending: false })
-        .limit(50);
+        .limit(500);
+      if (from) query = query.gte("performed_at", `${from}T00:00:00+06:00`);
+      if (to) query = query.lte("performed_at", `${to}T23:59:59+06:00`);
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
   });
+  const rows = useMemo(() => data.filter((m) => {
+    if (product && m.product_id !== product) return false;
+    if (type && m.movement_type !== type) return false;
+    if (loc && m.to_location !== loc && m.from_location !== loc) return false;
+    if (!inDateRange(m.performed_at, from, to)) return false;
+    const item = pmap.get(m.product_id);
+    const who = m.performed_by ? umap.get(m.performed_by) ?? "" : "";
+    const hay = `${item?.name ?? ""} ${item?.code ?? ""} ${m.batches?.batch_no ?? ""} ${m.reference_no ?? ""} ${m.remarks ?? ""} ${who}`.toLowerCase();
+    return !q || hay.includes(q.toLowerCase());
+  }), [data, q, product, loc, type, from, to, pmap, umap]);
+  const page = usePagedRows(rows, `${q}|${product}|${loc}|${type}|${from}|${to}|${types.join(",")}`);
+  const Icon: ComponentType<{ className?: string }> = types.length === 1 && types[0] === "OPENING"
+    ? PackageOpen
+    : types.includes("DAMAGE")
+      ? SlidersHorizontal
+      : Package;
   return (
-    <Section title={title} bodyClassName="p-0" className="mt-6">
+    <section className="surface-card mt-6 overflow-hidden">
+      <header className="flex flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-2">
+          <Icon className="size-4 text-primary" />
+          <h2 className="text-base font-semibold">{rows.length} {noun}</h2>
+        </div>
+        <ListToolbar query={q} onQuery={setQ} placeholder="Product, batch, reference…" from={from} to={to} onFrom={setFrom} onTo={setTo}>
+          <NativeSelect leading={<Pill />} value={product} onChange={(e) => setProduct(e.target.value)} className="h-9 w-40 shrink-0" aria-label="Product">
+            <option value="">All products</option>
+            {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </NativeSelect>
+          <NativeSelect leading={<MapPin />} value={loc} onChange={(e) => setLoc(e.target.value)} className="h-9 w-40 shrink-0" aria-label="Location">
+            <option value="">All locations</option>
+            {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+          </NativeSelect>
+          {types.length > 1 && (
+            <NativeSelect leading={<ArrowLeftRight />} value={type} onChange={(e) => setType(e.target.value)} className="h-9 w-44 shrink-0" aria-label="Type">
+              <option value="">All types</option>
+              {types.map((t) => <option key={t} value={t}>{humanize(t)}</option>)}
+            </NativeSelect>
+          )}
+          <FilterClear onClick={() => {
+            setQ("");
+            setProduct("");
+            setLoc("");
+            setType("");
+            reset();
+          }} />
+        </ListToolbar>
+      </header>
       {isLoading ? (
         <div className="p-6 text-sm text-muted-foreground">Loading…</div>
-      ) : data.length === 0 ? (
+      ) : rows.length === 0 ? (
         <div className="p-5">
-          <EmptyState title="Nothing yet" description={empty} />
+          <EmptyState title={data.length === 0 ? "Nothing yet" : "No matching entries"} description={data.length === 0 ? empty : "Try a different search or clear the filters."} />
         </div>
       ) : (
+        <>
         <Table>
           <TableHeader>
             <TableRow>
@@ -357,7 +246,7 @@ export function RecentMovements({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((m) => {
+            {page.pageRows.map((m) => {
               const isIn = !!m.to_location && !m.from_location;
               const loc = m.to_location ?? m.from_location;
               return (
@@ -393,7 +282,9 @@ export function RecentMovements({
             })}
           </TableBody>
         </Table>
+        <ListPager page={page.page} pages={page.pages} total={page.total} pageSize={page.pageSize} noun={noun} onPage={page.setPage} onSize={page.setPageSize} />
+        </>
       )}
-    </Section>
+    </section>
   );
 }

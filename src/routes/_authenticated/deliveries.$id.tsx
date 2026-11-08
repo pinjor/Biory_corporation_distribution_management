@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Printer } from "lucide-react";
+import { ArrowLeft, Printer } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { PageHeader, PageLoader, Money, Qty } from "@/components/app/page";
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,14 @@ function Challan() {
       <PageHeader
         eyebrow={<Link to="/orders/$id" params={{ id: d.order_id }} className="hover:underline">Order {d.orders?.order_no}</Link>}
         title="Delivery challan"
-        actions={<Button onClick={() => window.print()}><Printer /> Print / save PDF</Button>}
+        actions={
+          <>
+            <Button asChild variant="outline">
+              <Link to="/orders/$id" params={{ id: d.order_id }}><ArrowLeft /> Back</Link>
+            </Button>
+            <Button onClick={() => window.print()}><Printer /> Print / save PDF</Button>
+          </>
+        }
       />
       <article className="print-sheet surface-card mx-auto max-w-3xl p-6 sm:p-10">
         <header className="flex flex-col justify-between gap-4 border-b pb-6 sm:flex-row">

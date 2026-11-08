@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Camera, FileText, Send, X } from "lucide-react";
 import { toast } from "sonner";
@@ -8,9 +8,9 @@ import { PageHeader, Section, Field } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { useOnline } from "@/components/app/offline-provider";
 import { Button } from "@/components/ui/button";
-import { IconTip } from "@/components/ui/icon-tip";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { masterValuesQuery } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { errorMessage, todayBD } from "@/lib/format";
 import { compressReceipt, EXPENSE_CATEGORIES, RECEIPT_MAX_FILES, RECEIPT_TYPES, receiptProblem } from "@/lib/expenses";
@@ -22,6 +22,11 @@ export const Route = createFileRoute("/_authenticated/expenses/new")({
 
 function NewExpense() {
   const s = useSession();
+  const { data: masters = [] } = useQuery(masterValuesQuery);
+  const categories = masters.filter((row) => row.kind === "expense_category" && row.active && row.code);
+  const categoryOptions = categories.length
+    ? categories.map((row) => ({ value: row.code as string, label: row.name }))
+    : EXPENSE_CATEGORIES.map((row) => ({ value: row.value, label: row.label }));
   const qc = useQueryClient();
   const navigate = useNavigate();
   const online = useOnline();
@@ -65,10 +70,10 @@ function NewExpense() {
       if (error) throw error;
       return data as string;
     },
-    onSuccess: (id) => {
+    onSuccess: () => {
       toast.success("Expense submitted for Finance review");
       qc.invalidateQueries({ queryKey: ["expenses"] });
-      navigate({ to: "/expenses/$id", params: { id } });
+      navigate({ to: "/expenses" });
     },
     onError: (e) => toast.error(errorMessage(e)),
   });
@@ -87,7 +92,7 @@ function NewExpense() {
           </Field>
           <Field label="Category">
             <NativeSelect value={f.category} onChange={(e) => set("category", e.target.value)}>
-              {EXPENSE_CATEGORIES.map((c) => (
+              {categoryOptions.map((c) => (
                 <option key={c.value} value={c.value}>
                   {c.label}
                 </option>
@@ -131,7 +136,6 @@ function NewExpense() {
                     aria-label={`Remove ${file.name}`}
                   >
                     <X className="size-4" />
-                    <IconTip label={`Remove ${file.name}`} />
                   </button>
                 </li>
               ))}

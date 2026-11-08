@@ -6,7 +6,7 @@ describe("role page access", () => {
     expect(canOpen("/users", ["super_admin"])).toBe(true);
     expect(canOpen("/settings", ["super_admin"])).toBe(true);
     expect(canOpen("/inventory/receive", ["super_admin"])).toBe(true);
-    expect(rolesForPath("/inventory/receive")).not.toContain("sales_officer");
+    expect(rolesForPath("/inventory/receive")).toContain("sales_officer");
     expect(rolesForPath("/inventory")).toContain("sales_officer");
   });
 
@@ -27,6 +27,17 @@ describe("role page access", () => {
     expect(canOpen("/audit", ["sales_officer"])).toBe(false);
     expect(canOpen("/settings", ["sales_officer"])).toBe(false);
     expect(canOpen("/inventory/opening", ["sales_officer"])).toBe(false);
+    expect(canOpen("/inventory/receive", ["sales_officer"])).toBe(true);
+    expect(canOpen("/attendance", ["sales_officer"])).toBe(true);
+    expect(canOpen("/attendance/history", ["sales_officer"])).toBe(true);
+    expect(canOpen("/attendance", ["warehouse_admin"])).toBe(false);
+  });
+
+  it("hides a page when Role access has not granted that menu", () => {
+    expect(canOpen("/deposits", ["finance_admin"], ["/dashboard", "/wallet"])).toBe(false);
+    expect(canOpen("/wallet", ["finance_admin"], ["/dashboard", "/wallet"])).toBe(true);
+    expect(canOpen("/reports", ["warehouse_admin"], ["report:expiry"])).toBe(true);
+    expect(canOpen("/reports", ["finance_admin"], ["/dashboard"])).toBe(false);
   });
 
   it("blocks a signed-in person who has no role", () => {

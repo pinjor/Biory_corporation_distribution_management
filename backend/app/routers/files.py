@@ -16,7 +16,10 @@ router = APIRouter(prefix="/files", tags=["files"])
 BUCKETS = {
     "expense-receipts": {"super_admin", "admin", "finance_admin"},
     "deposit-proofs": {"super_admin", "admin", "finance_admin"},
+    # Colleagues see each other's profile photo on Users and attendance.
+    "profile-photos": set(),
 }
+IMAGE_BUCKETS = {"profile-photos"}
 ALLOWED_TYPES = {
     "image/jpeg": "jpg",
     "image/png": "png",
@@ -40,6 +43,8 @@ def _safe_path(bucket: str, path: str) -> Path:
 
 
 def _can_read(ctx: Ctx, bucket: str, path: str) -> None:
+    if bucket == "profile-photos":
+        return
     owner = path.split("/", 1)[0]
     if owner == str(ctx.user_id):
         return
@@ -60,6 +65,8 @@ async def upload(
     if not path.startswith(f"{ctx.user_id}/"):
         raise ApiError("Files must be stored in your own folder", 403, "forbidden")
     content_type = (file.content_type or "").split(";", 1)[0].strip().lower()
+    if bucket in IMAGE_BUCKETS and content_type not in {"image/jpeg", "image/png", "image/webp"}:
+        raise ApiError("Upload a JPG, PNG or WEBP photo", 400, "invalid_type")
     if content_type not in ALLOWED_TYPES:
         raise ApiError("Upload a JPG, PNG, WEBP image or a PDF", 400, "invalid_type")
     target = _safe_path(bucket, path)

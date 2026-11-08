@@ -1,18 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Pencil, Plus, Stethoscope } from "lucide-react";
+import { MapPin, Pencil, Plus, Stethoscope, Trash2 } from "lucide-react";
 import { api } from "@/lib/api/client";
+import { ConfirmDelete } from "@/components/app/confirm-delete";
+import { ListPager, usePagedRows } from "@/components/app/list-pager";
+import { FilterClear, ListToolbar, useListRange } from "@/components/app/list-toolbar";
 import { PageHeader, Section, StatusBadge, EmptyState } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { PartyDialog } from "@/components/app/party-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { territoriesQuery } from "@/lib/queries";
 import { useSession } from "@/lib/session";
-import { downloadCsv } from "@/lib/csv";
-
+import { inDateRange } from "@/lib/format";
 export const Route = createFileRoute("/_authenticated/doctors")({
   head: () => ({ meta: [{ title: "Doctors — BIORY Corporation" }] }),
   component: DoctorsPage,
@@ -20,10 +21,13 @@ export const Route = createFileRoute("/_authenticated/doctors")({
 
 function DoctorsPage() {
   const s = useSession();
+  const qc = useQueryClient();
   const { data: territories = [] } = useQuery(territoriesQuery);
   const [q, setQ] = useState("");
   const [territory, setTerritory] = useState("");
+  const { from, to, setFrom, setTo, reset } = useListRange();
   const [edit, setEdit] = useState<Record<string, string | number | null> | null | "new">(null);
+  const [remove, setRemove] = useState<{ id: string; name: string } | null>(null);
   const { data = [], isLoading } = useQuery({
     queryKey: ["doctors"],
     queryFn: async () => {
@@ -37,9 +41,11 @@ function DoctorsPage() {
   });
   const rows = data.filter(
     (d) =>
+      inDateRange(d.created_at, from, to) &&
       (!territory || d.territory_id === territory) &&
       (!q || `${d.code} ${d.name} ${d.speciality ?? ""} ${d.chamber ?? ""} ${d.mobile ?? ""}`.toLowerCase().includes(q.toLowerCase())),
   );
+  const page = usePagedRows(rows, `${q}|${territory}|${from}|${to}`);
   return (
     <div>
       <PageHeader
@@ -47,17 +53,6 @@ function DoctorsPage() {
         description={s.isStaff ? "Company-wide doctor master." : "Doctors you call on."}
         actions={
           <>
-            <Button
-              variant="outline"
-              onClick={() =>
-                downloadCsv("doctors.csv", [
-                  ["code", "name", "speciality", "qualification", "hospital", "chamber", "mobile", "territory", "assigned_so", "status"],
-                  ...rows.map((d) => [d.code, d.name, d.speciality, d.qualification, d.hospital, d.chamber, d.mobile, d.territories?.name, d.profiles?.full_name, d.status]),
-                ])
-              }
-            >
-              Export CSV
-            </Button>
             {(s.isSO || s.isAdmin) && (
               <Button onClick={() => setEdit("new")}>
                 <Plus /> New doctor
@@ -70,13 +65,13 @@ function DoctorsPage() {
         bodyClassName="p-0"
         title={`${rows.length} doctors`}
         actions={
-          <div className="flex gap-2">
-            <Input placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} className="h-8 w-52" />
-            <NativeSelect value={territory} onChange={(e) => setTerritory(e.target.value)} className="h-8 w-40">
+          <ListToolbar query={q} onQuery={setQ} placeholder="Name, chamber, mobile…" from={from} to={to} onFrom={setFrom} onTo={setTo}>
+            <NativeSelect leading={<MapPin />} value={territory} onChange={(e) => setTerritory(e.target.value)} className="h-9 w-40 shrink-0" aria-label="Territory">
               <option value="">All territories</option>
               {territories.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </NativeSelect>
-          </div>
+            <FilterClear onClick={() => { setQ(""); setTerritory(""); reset(); }} />
+          </ListToolbar>
         }
       >
         {isLoading ? (
@@ -84,19 +79,19 @@ function DoctorsPage() {
         ) : rows.length === 0 ? (
           <div className="p-5"><EmptyState title="No doctors yet" /></div>
         ) : (
+          <>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Doctor</TableHead>
                 <TableHead>Chamber / hospital</TableHead>
                 <TableHead>Mobile</TableHead>
-                {s.isStaff && <TableHead>Sales Officer</TableHead>}
                 <TableHead>Status</TableHead>
                 <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((d) => (
+              {page.pageRows.map((d) => (
                 <TableRow key={d.id}>
                   <TableCell>
                     <div className="font-medium">{d.name}</div>
@@ -109,7 +104,6 @@ function DoctorsPage() {
                     <div className="text-xs text-muted-foreground">{d.hospital}</div>
                   </TableCell>
                   <TableCell className="num text-xs">{d.mobile ?? "—"}</TableCell>
-                  {s.isStaff && <TableCell className="text-sm">{d.profiles?.full_name ?? "—"}</TableCell>}
                   <TableCell><StatusBadge status={d.status} /></TableCell>
                   <TableCell className="whitespace-nowrap text-right">
                     {s.isSO && d.assigned_so === s.userId && d.status === "active" && (
@@ -118,18 +112,36 @@ function DoctorsPage() {
                       </Button>
                     )}
                     {(s.isAdmin || d.assigned_so === s.userId) && (
-                      <Button variant="ghost" size="icon" onClick={() => setEdit(d as never)} aria-label="Edit">
-                        <Pencil />
-                      </Button>
+                      <>
+                        <Button variant="ghost" size="icon" onClick={() => setEdit(d as never)} aria-label={`Edit ${d.name}`}>
+                          <Pencil />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => setRemove({ id: d.id, name: d.name })} aria-label={`Delete ${d.name}`}>
+                          <Trash2 />
+                        </Button>
+                      </>
                     )}
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+          <ListPager page={page.page} pages={page.pages} total={page.total} pageSize={page.pageSize} noun="doctors" onPage={page.setPage} onSize={page.setPageSize} />
+          </>
         )}
       </Section>
       {edit && <PartyDialog kind="doctor" initial={edit === "new" ? null : edit} onClose={() => setEdit(null)} />}
+      {remove && (
+        <ConfirmDelete
+          title={`Delete ${remove.name}?`}
+          onClose={() => setRemove(null)}
+          run={async () => {
+            const { error } = await api.from("doctors").delete().eq("id", remove.id);
+            if (error) throw error;
+            qc.invalidateQueries({ queryKey: ["doctors"] });
+          }}
+        />
+      )}
     </div>
   );
 }

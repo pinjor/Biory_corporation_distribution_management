@@ -997,13 +997,14 @@ export type Database = {
           reorder_level: number
           strength: string | null
           trade_discount_pct: number
+          uom: string | null
           updated_at: string
         }
         Insert: {
           active?: boolean
           base_trp?: number | null
           category?: string | null
-          code: string
+          code?: string
           created_at?: string
           dosage_form?: string | null
           generic_name?: string | null
@@ -1015,6 +1016,7 @@ export type Database = {
           reorder_level?: number
           strength?: string | null
           trade_discount_pct?: number
+          uom?: string | null
           updated_at?: string
         }
         Update: {
@@ -1033,6 +1035,7 @@ export type Database = {
           reorder_level?: number
           strength?: string | null
           trade_discount_pct?: number
+          uom?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1040,6 +1043,7 @@ export type Database = {
       profiles: {
         Row: {
           active: boolean
+          avatar_path: string | null
           created_at: string
           email: string | null
           full_name: string
@@ -1050,6 +1054,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          avatar_path?: string | null
           created_at?: string
           email?: string | null
           full_name?: string
@@ -1060,6 +1065,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          avatar_path?: string | null
           created_at?: string
           email?: string | null
           full_name?: string

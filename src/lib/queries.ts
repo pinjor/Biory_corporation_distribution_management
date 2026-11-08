@@ -16,6 +16,37 @@ export const settingsQuery = queryOptions({
   gcTime: OFFLINE_GC,
 });
 
+export type MasterValue = {
+  id: string;
+  kind: string;
+  name: string;
+  code: string | null;
+  active: boolean;
+  created_at?: string;
+};
+
+export type GeoPlace = { id: string; level: "division" | "district" | "upazila"; name: string; parent_id: string | null };
+
+export const geoPlacesQuery = queryOptions({
+  queryKey: ["geo-places"],
+  queryFn: async () => {
+    const { data, error } = await api.from("geo_places").select("id, level, name, parent_id").order("name").limit(2000);
+    if (error) throw error;
+    return (data ?? []) as GeoPlace[];
+  },
+  staleTime: 60_000,
+});
+
+export const masterValuesQuery = queryOptions({
+  queryKey: ["master-values"],
+  queryFn: async () => {
+    const { data, error } = await api.from("master_values").select("id, kind, name, code, active, created_at").order("name");
+    if (error) throw error;
+    return (data ?? []) as MasterValue[];
+  },
+  staleTime: 30_000,
+});
+
 export const productsQuery = queryOptions({
   queryKey: ["products"],
   queryFn: async () => {

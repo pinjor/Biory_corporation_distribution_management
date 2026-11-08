@@ -135,7 +135,11 @@ async def login(body: LoginIn, request: Request) -> dict:
 @router.post("/signup")
 async def signup(body: SignupIn, request: Request) -> dict:
     if not settings.allow_signup:
-        raise ApiError("Sign-up is closed", 403, "signup_closed")
+        raise ApiError(
+            "Accounts are created by an administrator. Please contact your admin.",
+            403,
+            "signup_closed",
+        )
     await _limit(request, "signup", 10)
     email = _email(body.email)
     full_name = body.full_name.strip()

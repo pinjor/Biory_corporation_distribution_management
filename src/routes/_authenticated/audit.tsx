@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { ScrollText } from "lucide-react";
 import { api } from "@/lib/api/client";
+import { ListPager, usePagedRows } from "@/components/app/list-pager";
 import { PageHeader, Section, EmptyState } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
@@ -42,6 +44,7 @@ function AuditPage() {
       return data;
     },
   });
+  const page = usePagedRows(data, `${entity}|${limit}`);
   return (
     <div>
       <PageHeader title="Audit log" description="Immutable record of who changed what and when. Entries can't be edited or deleted." />
@@ -49,7 +52,7 @@ function AuditPage() {
         bodyClassName="p-0"
         title={`${data.length} events`}
         actions={
-          <NativeSelect value={entity} onChange={(e) => setEntity(e.target.value)} className="h-8 w-44">
+          <NativeSelect leading={<ScrollText />} value={entity} onChange={(e) => setEntity(e.target.value)} className="h-9 w-44 shrink-0" aria-label="Record">
             <option value="">All records</option>
             {ENTITIES.map((e) => <option key={e} value={e}>{humanize(e)}</option>)}
           </NativeSelect>
@@ -60,6 +63,7 @@ function AuditPage() {
         ) : data.length === 0 ? (
           <div className="p-5"><EmptyState title="No events" /></div>
         ) : (
+          <>
           <Table>
             <TableHeader>
               <TableRow>
@@ -70,7 +74,7 @@ function AuditPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((a) => (
+              {page.pageRows.map((a) => (
                 <TableRow key={a.id}>
                   <TableCell className="whitespace-nowrap text-xs">{formatDateTime(a.created_at)}</TableCell>
                   <TableCell className="text-sm">{a.actor ? (names.get(a.actor) ?? "Unknown user") : "System"}</TableCell>
@@ -87,6 +91,8 @@ function AuditPage() {
               ))}
             </TableBody>
           </Table>
+          <ListPager page={page.page} pages={page.pages} total={page.total} pageSize={page.pageSize} noun="events" onPage={page.setPage} onSize={page.setPageSize} />
+          </>
         )}
       </Section>
       {data.length >= limit && (

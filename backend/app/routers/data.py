@@ -39,8 +39,8 @@ class QueryIn(BaseModel):
 
 class WriteIn(BaseModel):
     table: str
-    op: Literal["insert", "update"]
-    values: dict[str, Any]
+    op: Literal["insert", "update", "delete"]
+    values: dict[str, Any] = Field(default_factory=dict)
     filters: list[FilterIn] = Field(default_factory=list)
 
 

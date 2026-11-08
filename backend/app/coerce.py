@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -24,13 +24,31 @@ def coerce_pg(type_name: str, value: Any) -> Any:
     if base == "date":
         if isinstance(value, datetime):
             return value.date()
-        if isinstance(value, date):
+        if isinstance(value, date) and not isinstance(value, datetime):
             return value
-        return date.fromisoformat(str(value)[:10])
+        try:
+            return date.fromisoformat(str(value)[:10])
+        except ValueError:
+            raise ApiError("Enter a valid date", 400) from None
     if "timestamp" in base:
         if isinstance(value, datetime):
             return value
-        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        try:
+            return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            raise ApiError("Enter a valid date and time", 400) from None
+    if base in {"time", "time without time zone", "time with time zone"}:
+        if isinstance(value, time):
+            return value
+        text = str(value).strip()
+        try:
+            parts = text.split(":")
+            hour = int(parts[0])
+            minute = int(parts[1])
+            second = int(parts[2].split(".", 1)[0]) if len(parts) > 2 else 0
+            return time(hour, minute, second)
+        except (ValueError, IndexError):
+            raise ApiError("Enter a valid time", 400) from None
     if base == "uuid":
         return value if isinstance(value, UUID) else UUID(str(value))
     if base in {"numeric", "decimal"}:

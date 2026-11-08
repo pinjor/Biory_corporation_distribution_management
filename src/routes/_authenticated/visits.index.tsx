@@ -1,18 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Plus } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus, Users } from "lucide-react";
 import { api } from "@/lib/api/client";
+import { ListPager, usePagedRows } from "@/components/app/list-pager";
+import { FilterClear, ListToolbar } from "@/components/app/list-toolbar";
 import { PageHeader, Section, EmptyState } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { salesOfficersQuery } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { addDays, formatDate, todayBD } from "@/lib/format";
-import { downloadCsv } from "@/lib/csv";
-
 export const Route = createFileRoute("/_authenticated/visits/")({
   head: () => ({ meta: [{ title: "Doctor visits — BIORY Corporation" }] }),
   component: VisitsPage,
@@ -20,6 +19,7 @@ export const Route = createFileRoute("/_authenticated/visits/")({
 
 function VisitsPage() {
   const s = useSession();
+  const [q, setQ] = useState("");
   const [from, setFrom] = useState(addDays(todayBD(), -30));
   const [to, setTo] = useState(todayBD());
   const [so, setSo] = useState("");
@@ -41,7 +41,12 @@ function VisitsPage() {
       return data;
     },
   });
-  const promoUnits = data.reduce((a, v) => a + v.visit_items.reduce((b, i) => b + i.qty, 0), 0);
+  const rows = useMemo(() => data.filter((v) => {
+    const hay = `${v.visit_no} ${v.doctors?.name ?? ""} ${v.purpose ?? ""} ${v.profiles?.full_name ?? ""}`.toLowerCase();
+    return !q || hay.includes(q.toLowerCase());
+  }), [data, q]);
+  const promoUnits = rows.reduce((a, v) => a + v.visit_items.reduce((b, i) => b + i.qty, 0), 0);
+  const page = usePagedRows(rows, `${q}|${from}|${to}|${so}`);
   return (
     <div>
       <PageHeader
@@ -49,18 +54,7 @@ function VisitsPage() {
         description="Visits and the samples or gifts handed over — each one draws down the SO's promotional stock."
         actions={
           <>
-            <Button
-              variant="outline"
-              onClick={() =>
-                downloadCsv("doctor-visits.csv", [
-                  ["visit_no", "date", "doctor", "speciality", "so", "purpose", "items"],
-                  ...data.map((v) => [v.visit_no, v.visit_date, v.doctors?.name, v.doctors?.speciality, v.profiles?.full_name, v.purpose, v.visit_items.map((i) => `${i.products?.name} x${i.qty}`).join("; ")]),
-                ])
-              }
-            >
-              Export CSV
-            </Button>
-            {s.isSO && (
+            {(s.isSO || s.isSuper) && (
               <Button asChild>
                 <Link to="/visits/new"><Plus /> Log visit</Link>
               </Button>
@@ -70,29 +64,30 @@ function VisitsPage() {
       />
       <Section
         bodyClassName="p-0"
-        title={`${data.length} visits · ${promoUnits} promo units`}
+        title={`${rows.length} visits · ${promoUnits} promo units`}
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-8 w-36" />
-            <Input type="date" value={to} max={todayBD()} onChange={(e) => setTo(e.target.value)} className="h-8 w-36" />
+          <ListToolbar query={q} onQuery={setQ} placeholder="Visit / doctor…" from={from} to={to} onFrom={setFrom} onTo={setTo}>
             {s.isStaff && (
-              <NativeSelect value={so} onChange={(e) => setSo(e.target.value)} className="h-8 w-40">
+              <NativeSelect leading={<Users />} value={so} onChange={(e) => setSo(e.target.value)} className="h-9 w-40 shrink-0" aria-label="Sales officer">
                 <option value="">All SOs</option>
                 {sos.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
               </NativeSelect>
             )}
-          </div>
+            <FilterClear onClick={() => { setQ(""); setSo(""); setFrom(addDays(todayBD(), -30)); setTo(todayBD()); }} />
+          </ListToolbar>
         }
       >
         {isLoading ? (
           <div className="p-6 text-sm text-muted-foreground">Loading…</div>
-        ) : data.length === 0 ? (
+        ) : rows.length === 0 ? (
           <div className="p-5"><EmptyState title="No visits in this period" /></div>
         ) : (
+          <>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Visit</TableHead>
+                <TableHead>Date & time</TableHead>
                 <TableHead>Doctor</TableHead>
                 {s.isStaff && <TableHead>SO</TableHead>}
                 <TableHead>Purpose</TableHead>
@@ -100,13 +95,12 @@ function VisitsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((v) => (
+              {page.pageRows.map((v) => (
                 <TableRow key={v.id}>
-                  <TableCell>
-                    <div className="num font-medium">{v.visit_no}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {formatDate(v.visit_date)} {v.start_time ? `· ${v.start_time.slice(0, 5)}–${v.end_time?.slice(0, 5) ?? ""}` : ""}
-                    </div>
+                  <TableCell className="num font-medium">{v.visit_no}</TableCell>
+                  <TableCell className="whitespace-nowrap text-sm">
+                    {formatDate(v.visit_date)}
+                    {v.start_time ? ` · ${v.start_time.slice(0, 5)}${v.end_time ? `–${v.end_time.slice(0, 5)}` : ""}` : ""}
                   </TableCell>
                   <TableCell>
                     <div className="font-medium">{v.doctors?.name}</div>
@@ -124,6 +118,8 @@ function VisitsPage() {
               ))}
             </TableBody>
           </Table>
+          <ListPager page={page.page} pages={page.pages} total={page.total} pageSize={page.pageSize} noun="visits" onPage={page.setPage} onSize={page.setPageSize} />
+          </>
         )}
       </Section>
     </div>

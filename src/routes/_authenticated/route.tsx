@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { api } from "@/lib/api/client";
 import { AppShell } from "@/components/app/app-shell";
-import { canOpen } from "@/lib/access";
+import { canOpen, firstOpenPath } from "@/lib/access";
 import type { AppRole, SessionInfo } from "@/lib/session";
 import {
   clearOfflineCaches,
@@ -26,9 +26,7 @@ export const Route = createFileRoute("/_authenticated")({
     const cached = readSessionCache();
     // No connection: open with the identity last seen on this device (server calls still need a valid sign-in).
     if (cached && typeof navigator !== "undefined" && navigator.onLine === false) {
-      if (cached.roles.length > 0 && !canOpen(location.pathname, cached.roles)) {
-        throw redirect({ to: "/dashboard" });
-      }
+      redirectIfBlocked(location.pathname, cached.roles, cached.menus);
       return { session: cached, offline: true };
     }
 
@@ -48,9 +46,7 @@ export const Route = createFileRoute("/_authenticated")({
 
     if (!result?.data.user) {
       if (networkError && cached) {
-        if (cached.roles.length > 0 && !canOpen(location.pathname, cached.roles)) {
-          throw redirect({ to: "/dashboard" });
-        }
+        redirectIfBlocked(location.pathname, cached.roles, cached.menus);
         return { session: cached, offline: true };
       }
       throw redirect({ to: "/auth", search: { redirect: location.href } as never });
@@ -62,9 +58,7 @@ export const Route = createFileRoute("/_authenticated")({
       api.from("user_roles").select("role").eq("user_id", user.id),
     ]);
     if (rolesError && cached?.userId === user.id) {
-      if (cached.roles.length > 0 && !canOpen(location.pathname, cached.roles)) {
-        throw redirect({ to: "/dashboard" });
-      }
+      redirectIfBlocked(location.pathname, cached.roles, cached.menus);
       return { session: cached, offline: true };
     }
 
@@ -74,11 +68,20 @@ export const Route = createFileRoute("/_authenticated")({
       profile: profile ?? null,
       roles: (roles ?? []).map((r) => r.role as AppRole),
     };
-    saveSessionCache(session);
-    if (session.roles.length > 0 && !canOpen(location.pathname, session.roles)) {
-      throw redirect({ to: "/dashboard" });
+    const menuResult = await api.rpc("list_role_menus");
+    if (!menuResult.error && Array.isArray(menuResult.data)) {
+      const granted = menuResult.data as { role: AppRole; menu_key: string }[];
+      session.menus = granted.filter((row) => session.roles.includes(row.role)).map((row) => row.menu_key);
     }
+    saveSessionCache(session);
+    redirectIfBlocked(location.pathname, session.roles, session.menus);
     return { session, offline: false };
   },
   component: AppShell,
 });
+
+function redirectIfBlocked(pathname: string, roles: AppRole[], menus?: string[]) {
+  if (roles.length === 0 || canOpen(pathname, roles, menus)) return;
+  const next = (firstOpenPath(roles, menus) ?? "/dashboard") as "/dashboard";
+  if (next !== pathname) throw redirect({ to: next });
+}

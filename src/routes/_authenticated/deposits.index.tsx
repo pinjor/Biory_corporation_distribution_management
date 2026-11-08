@@ -1,16 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Paperclip } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ClipboardList, Eye, Paperclip } from "lucide-react";
 import { api } from "@/lib/api/client";
+import { ListPager, usePagedRows } from "@/components/app/list-pager";
+import { FilterClear, ListToolbar, useListRange } from "@/components/app/list-toolbar";
 import { PageHeader, Section, StatusBadge, EmptyState, Money } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useSession } from "@/lib/session";
-import { formatDate, formatDateTime } from "@/lib/format";
-import { downloadCsv } from "@/lib/csv";
-
+import { formatDate, formatDateTime, inDateRange } from "@/lib/format";
 export const Route = createFileRoute("/_authenticated/deposits/")({
   head: () => ({ meta: [{ title: "Deposits — BIORY Corporation" }] }),
   component: DepositsPage,
@@ -18,7 +18,9 @@ export const Route = createFileRoute("/_authenticated/deposits/")({
 
 function DepositsPage() {
   const s = useSession();
+  const [q, setQ] = useState("");
   const [status, setStatus] = useState(s.isFinance ? "SUBMITTED" : "");
+  const { from, to, setFrom, setTo, reset } = useListRange();
   const { data = [], isLoading } = useQuery({
     queryKey: ["deposits", status],
     queryFn: async () => {
@@ -29,7 +31,13 @@ function DepositsPage() {
       return data;
     },
   });
-  const total = data.reduce((a, d) => a + Number(d.amount), 0);
+  const rows = useMemo(() => data.filter((d) => {
+    if (!inDateRange(d.created_at, from, to)) return false;
+    const hay = `${d.deposit_no} ${d.method ?? ""} ${d.transaction_id ?? ""} ${d.profiles?.full_name ?? ""}`.toLowerCase();
+    return !q || hay.includes(q.toLowerCase());
+  }), [data, q, from, to]);
+  const total = rows.reduce((a, d) => a + Number(d.amount), 0);
+  const page = usePagedRows(rows, `${q}|${status}|${from}|${to}`);
   return (
     <div>
       <PageHeader
@@ -37,17 +45,6 @@ function DepositsPage() {
         description={s.isFinance ? "Verify SO remittances against the bank/MFS statement before approving." : "Money you've handed to the company."}
         actions={
           <>
-            <Button
-              variant="outline"
-              onClick={() =>
-                downloadCsv("deposits.csv", [
-                  ["deposit_no", "so", "amount", "method", "provider", "txn_id", "date", "status", "receipt_no", "reviewed_at"],
-                  ...data.map((d) => [d.deposit_no, d.profiles?.full_name, d.amount, d.method, d.provider, d.transaction_id, d.deposit_date, d.status, d.receipt_no, d.reviewed_at]),
-                ])
-              }
-            >
-              Export CSV
-            </Button>
             {s.isSO && (
               <Button asChild variant="highlight">
                 <Link to="/wallet">New deposit</Link>
@@ -58,21 +55,25 @@ function DepositsPage() {
       />
       <Section
         bodyClassName="p-0"
-        title={<span>{data.length} deposits · <Money value={total} /></span>}
+        title={<span>{rows.length} deposits · <Money value={total} /></span>}
         actions={
-          <NativeSelect value={status} onChange={(e) => setStatus(e.target.value)} className="h-8 w-40">
-            <option value="">All statuses</option>
-            <option value="SUBMITTED">Submitted</option>
-            <option value="APPROVED">Approved</option>
-            <option value="REJECTED">Rejected</option>
-          </NativeSelect>
+          <ListToolbar query={q} onQuery={setQ} placeholder="Deposit / officer…" from={from} to={to} onFrom={setFrom} onTo={setTo}>
+            <NativeSelect leading={<ClipboardList />} value={status} onChange={(e) => setStatus(e.target.value)} className="h-9 w-40 shrink-0" aria-label="Status">
+              <option value="">All statuses</option>
+              <option value="SUBMITTED">Submitted</option>
+              <option value="APPROVED">Approved</option>
+              <option value="REJECTED">Rejected</option>
+            </NativeSelect>
+            <FilterClear onClick={() => { setQ(""); setStatus(s.isFinance ? "SUBMITTED" : ""); reset(); }} />
+          </ListToolbar>
         }
       >
         {isLoading ? (
           <div className="p-6 text-sm text-muted-foreground">Loading…</div>
-        ) : data.length === 0 ? (
+        ) : rows.length === 0 ? (
           <div className="p-5"><EmptyState title="No deposits here" /></div>
         ) : (
+          <>
           <Table>
             <TableHeader>
               <TableRow>
@@ -82,10 +83,11 @@ function DepositsPage() {
                 <TableHead>Submitted</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((d) => (
+              {page.pageRows.map((d) => (
                 <TableRow key={d.id}>
                   <TableCell>
                     <Link to="/deposits/$id" params={{ id: d.id }} className="num font-medium text-primary hover:underline">{d.deposit_no}</Link>
@@ -101,10 +103,17 @@ function DepositsPage() {
                   <TableCell className="text-xs">{formatDateTime(d.created_at)}</TableCell>
                   <TableCell><StatusBadge status={d.status} /></TableCell>
                   <TableCell className="text-right font-semibold"><Money value={d.amount} /></TableCell>
+                  <TableCell className="text-right">
+                    <Button asChild size="icon" variant="ghost" aria-label={`View ${d.deposit_no}`} className="size-8">
+                      <Link to="/deposits/$id" params={{ id: d.id }}><Eye /></Link>
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+          <ListPager page={page.page} pages={page.pages} total={page.total} pageSize={page.pageSize} noun="deposits" onPage={page.setPage} onSize={page.setPageSize} />
+          </>
         )}
       </Section>
     </div>

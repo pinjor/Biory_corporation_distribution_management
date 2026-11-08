@@ -1,19 +1,16 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+﻿import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
-  ArrowLeftRight,
   History,
-  PackageOpen,
+  CalendarClock,
   PackagePlus,
+  Pill,
   SlidersHorizontal,
-  Store,
   UserRound,
   Warehouse,
 } from "lucide-react";
-import { toast } from "sonner";
 import { api } from "@/lib/api/client";
-import type { Database } from "@/lib/database.types";
 import {
   PageHeader,
   Section,
@@ -21,21 +18,13 @@ import {
   Qty,
   ExpiryBadge,
   EmptyState,
-  Field,
   StatCard,
 } from "@/components/app/page";
+import { ListPager, usePagedRows } from "@/components/app/list-pager";
+import { FilterClear, ListToolbar, useListRange } from "@/components/app/list-toolbar";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -46,34 +35,45 @@ import {
 } from "@/components/ui/table";
 import { locationsQuery, myAvailableStockQuery, productsQuery, settingsQuery } from "@/lib/queries";
 import { useSession } from "@/lib/session";
-import { errorMessage, formatBDT, formatDate } from "@/lib/format";
-import { downloadCsv } from "@/lib/csv";
+import { formatBDT, formatDate, inDateRange } from "@/lib/format";
 
-type StockRow = Database["public"]["Views"]["v_stock"]["Row"];
+type ExpiryCard = "near" | "expired" | "ok";
 
 export const Route = createFileRoute("/_authenticated/inventory/")({
+  validateSearch: (s: Record<string, unknown>): { expiry?: ExpiryCard } => {
+    const raw = s["expiry"];
+    return raw === "near" || raw === "expired" ? { expiry: raw } : {};
+  },
   head: () => ({ meta: [{ title: "Stock — BIORY Corporation" }] }),
   component: InventoryPage,
 });
 
 function InventoryPage() {
   const s = useSession();
+  const navigate = useNavigate();
+  const { expiry = "" } = Route.useSearch();
   const { data: locations = [] } = useQuery(locationsQuery);
   const { data: settings } = useQuery(settingsQuery);
   const central = locations.find((l) => l.kind === "central");
   const mine = locations.find((l) => l.so_id === s.userId);
   const soLocs = locations.filter((l) => l.kind === "so");
-  const partyLocs = locations.filter((l) => l.kind === "chemist" || l.kind === "doctor");
-  const [tab, setTab] = useState<"central" | "so" | "party">(s.isStaff ? "central" : "so");
+  const [tab, setTab] = useState<"central" | "so">(s.isStaff ? "central" : "so");
   const [soLoc, setSoLoc] = useState<string>("");
-  const [partyLoc, setPartyLoc] = useState<string>("");
-  const locId = tab === "central" ? central?.id : tab === "party" ? partyLoc || partyLocs[0]?.id : s.isStaff ? soLoc || soLocs[0]?.id : mine?.id;
+  const locId = tab === "central" ? central?.id : s.isStaff ? soLoc || soLocs[0]?.id : mine?.id;
   const [kind, setKind] = useState("");
-  const [expiry, setExpiry] = useState("");
   const [q, setQ] = useState("");
-  const [adjust, setAdjust] = useState<StockRow | null>(null);
-  const [transfer, setTransfer] = useState<StockRow | null>(null);
+  const { from, to, setFrom, setTo, reset } = useListRange(0);
   const near = settings?.near_expiry_days ?? 90;
+  function showAll() {
+    if (expiry) void navigate({ to: "/inventory", search: {}, replace: true });
+  }
+  function pickExpiry(next: ExpiryCard) {
+    void navigate({
+      to: "/inventory",
+      search: expiry === next ? {} : { expiry: next },
+      replace: true,
+    });
+  }
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["stock", locId],
@@ -99,6 +99,7 @@ function InventoryPage() {
         if (expiry === "expired" && d > 0) return false;
         if (expiry === "near" && (d <= 0 || d > near)) return false;
         if (expiry === "ok" && d <= near) return false;
+        if (!inDateRange(r.expiry_date, from, to)) return false;
         if (
           q &&
           !`${r.product_code} ${r.product_name} ${r.batch_no}`
@@ -108,8 +109,9 @@ function InventoryPage() {
           return false;
         return true;
       }),
-    [rows, kind, expiry, q, near],
+    [rows, kind, expiry, q, near, from, to],
   );
+  const page = usePagedRows(filtered, `${locId ?? ""}|${q}|${kind}|${expiry}|${from}|${to}`);
 
   const totals = useMemo(() => {
     let value = 0,
@@ -159,33 +161,18 @@ function InventoryPage() {
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Tabs value={tab} onValueChange={(v) => setTab(v as "central" | "so" | "party")}>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as "central" | "so")}>
           <TabsList>
-            <TabsTrigger value="central">
-              <Warehouse /> Central warehouse
-            </TabsTrigger>
+            {s.isStaff && (
+              <TabsTrigger value="central">
+                <Warehouse /> Central warehouse
+              </TabsTrigger>
+            )}
             <TabsTrigger value="so">
               <UserRound /> {s.isStaff ? "SO stock" : "My stock"}
             </TabsTrigger>
-            <TabsTrigger value="party">
-              <Store /> Chemist & doctor
-            </TabsTrigger>
           </TabsList>
         </Tabs>
-        {tab === "party" && (
-          <NativeSelect
-            className="w-60"
-            value={partyLoc || partyLocs[0]?.id || ""}
-            onChange={(e) => setPartyLoc(e.target.value)}
-          >
-            {partyLocs.length === 0 && <option value="">No chemist or doctor stock yet</option>}
-            {partyLocs.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.kind === "doctor" ? "Doctor" : "Chemist"} · {l.name}
-              </option>
-            ))}
-          </NativeSelect>
-        )}
         {tab === "so" && s.isStaff && (
           <NativeSelect
             className="w-60"
@@ -203,19 +190,23 @@ function InventoryPage() {
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard label="Units on hand" value={<Qty value={totals.units} />} />
-        <StatCard label="Value at TRP" value={formatBDT(totals.value)} />
+        <StatCard label="Units on hand" value={<Qty value={totals.units} />} active={!expiry} onClick={showAll} />
+        <StatCard label="Value at TRP" value={formatBDT(totals.value)} active={!expiry} onClick={showAll} />
         <StatCard
           label="Near expiry batches"
           value={totals.nearN}
           tone={totals.nearN ? "warning" : "default"}
           hint={`Within ${near} days`}
+          active={expiry === "near"}
+          onClick={() => pickExpiry("near")}
         />
         <StatCard
           label="Expired batches"
           value={totals.expN}
           tone={totals.expN ? "destructive" : "default"}
           hint="Blocked from use"
+          active={expiry === "expired"}
+          onClick={() => pickExpiry("expired")}
         />
       </div>
 
@@ -225,65 +216,27 @@ function InventoryPage() {
         title="Batches"
         bodyClassName="p-0"
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Input
-              placeholder="Search…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="h-8 w-40"
-            />
-            <NativeSelect
-              value={kind}
-              onChange={(e) => setKind(e.target.value)}
-              className="h-8 w-32"
-            >
+          <ListToolbar query={q} onQuery={setQ} placeholder="Product / batch…" from={from} to={to} onFrom={setFrom} onTo={setTo}>
+            <NativeSelect leading={<Pill />} value={kind} onChange={(e) => setKind(e.target.value)} className="h-9 w-40 shrink-0" aria-label="Kind">
               <option value="">All kinds</option>
               <option value="saleable">Saleable</option>
               <option value="promotional">Promotional</option>
             </NativeSelect>
-            <NativeSelect
-              value={expiry}
-              onChange={(e) => setExpiry(e.target.value)}
-              className="h-8 w-32"
-            >
+            <NativeSelect leading={<CalendarClock />} value={expiry} onChange={(e) => {
+              const value = e.target.value;
+              void navigate({
+                to: "/inventory",
+                search: value === "near" || value === "expired" || value === "ok" ? { expiry: value } : {},
+                replace: true,
+              });
+            }} className="h-9 w-40 shrink-0" aria-label="Expiry">
               <option value="">Any expiry</option>
               <option value="near">Near expiry</option>
               <option value="expired">Expired</option>
               <option value="ok">Healthy</option>
             </NativeSelect>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() =>
-                downloadCsv("stock.csv", [
-                  [
-                    "location",
-                    "product_code",
-                    "product",
-                    "kind",
-                    "batch",
-                    "expiry",
-                    "qty",
-                    "base_trp",
-                    "value_trp",
-                  ],
-                  ...filtered.map((r) => [
-                    r.location_name,
-                    r.product_code,
-                    r.product_name,
-                    r.product_kind,
-                    r.batch_no,
-                    r.expiry_date,
-                    r.qty,
-                    r.base_trp,
-                    r.value_trp,
-                  ]),
-                ])
-              }
-            >
-              Export
-            </Button>
-          </div>
+            <FilterClear onClick={() => { setQ(""); setKind(""); showAll(); reset(); }} />
+          </ListToolbar>
         }
       >
         {isLoading ? (
@@ -307,6 +260,7 @@ function InventoryPage() {
             />
           </div>
         ) : (
+          <>
           <Table>
             <TableHeader>
               <TableRow>
@@ -316,11 +270,10 @@ function InventoryPage() {
                 <TableHead className="text-right">On hand</TableHead>
                 <TableHead className="text-right">Base TRP</TableHead>
                 <TableHead className="text-right">Value</TableHead>
-                {s.isWarehouse && <TableHead />}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((r) => (
+              {page.pageRows.map((r) => (
                 <TableRow key={`${r.location_id}-${r.batch_id}`}>
                   <TableCell>
                     <div className="font-medium">{r.product_name}</div>
@@ -344,45 +297,27 @@ function InventoryPage() {
                   <TableCell className="text-right">
                     <Money value={r.value_trp} />
                   </TableCell>
-                  {s.isWarehouse && (
-                    <TableCell className="whitespace-nowrap text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setTransfer(r)}
-                        aria-label="Transfer"
-                      >
-                        <ArrowLeftRight />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setAdjust(r)}
-                        aria-label="Adjust"
-                      >
-                        <SlidersHorizontal />
-                      </Button>
-                    </TableCell>
-                  )}
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+          <ListPager page={page.page} pages={page.pages} total={page.total} pageSize={page.pageSize} noun="batches" onPage={page.setPage} onSize={page.setPageSize} />
+          </>
         )}
       </Section>
-      {adjust && <AdjustDialog row={adjust} onClose={() => setAdjust(null)} />}
-      {transfer && <TransferDialog row={transfer} onClose={() => setTransfer(null)} />}
     </div>
   );
 }
 
 function MyAvailability() {
   const { data = [] } = useQuery(myAvailableStockQuery);
+  const page = usePagedRows(data, data.length);
   const { data: products = [] } = useQuery(productsQuery);
   const byId = new Map(products.map((p) => [p.id, p]));
   if (data.length === 0) return null;
   return (
     <Section title="Available to sell" className="mb-6" bodyClassName="p-0">
+      <>
       <Table>
         <TableHeader>
           <TableRow>
@@ -393,7 +328,7 @@ function MyAvailability() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((r) => (
+          {page.pageRows.map((r) => (
             <TableRow key={r.product_id}>
               <TableCell className="font-medium">{byId.get(r.product_id)?.name ?? "—"}</TableCell>
               <TableCell className="text-right">
@@ -409,156 +344,8 @@ function MyAvailability() {
           ))}
         </TableBody>
       </Table>
+      <ListPager page={page.page} pages={page.pages} total={page.total} pageSize={page.pageSize} noun="products" onPage={page.setPage} onSize={page.setPageSize} />
+      </>
     </Section>
-  );
-}
-
-const ADJ_TYPES = [
-  ["DAMAGE", "Damage (out)"],
-  ["EXPIRED", "Expired write-off (out)"],
-  ["LOSS", "Loss (out)"],
-  ["MANUAL_ADJUSTMENT_OUT", "Correction (out)"],
-  ["MANUAL_ADJUSTMENT_IN", "Correction (in)"],
-  ["CUSTOMER_RETURN", "Customer return (in)"],
-] as const;
-
-function AdjustDialog({ row, onClose }: { row: StockRow; onClose: () => void }) {
-  const qc = useQueryClient();
-  const [type, setType] = useState<string>("DAMAGE");
-  const [qty, setQty] = useState("");
-  const [reason, setReason] = useState("");
-  const m = useMutation({
-    mutationFn: async () => {
-      const { error } = await api.rpc("adjust_stock", {
-        p_location: row.location_id!,
-        p_batch: row.batch_id!,
-        p_qty: Number(qty),
-        p_type: type,
-        p_reason: reason,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Adjustment posted to the ledger");
-      qc.invalidateQueries({ queryKey: ["stock"] });
-      onClose();
-    },
-    onError: (e) => toast.error(errorMessage(e)),
-  });
-  return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
-            Adjust {row.product_name} · {row.batch_no}
-          </DialogTitle>
-        </DialogHeader>
-        <p className="text-sm text-muted-foreground">
-          On hand at {row.location_name}: <Qty value={row.qty} />
-        </p>
-        <div className="grid gap-4">
-          <Field label="Adjustment type">
-            <NativeSelect value={type} onChange={(e) => setType(e.target.value)}>
-              {ADJ_TYPES.map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field label="Quantity">
-            <Input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} />
-          </Field>
-          <Field label="Reason (required)">
-            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} />
-          </Field>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={() => m.mutate()} disabled={m.isPending || !qty || !reason.trim()}>
-            Post adjustment
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function TransferDialog({ row, onClose }: { row: StockRow; onClose: () => void }) {
-  const qc = useQueryClient();
-  const { data: locations = [] } = useQuery(locationsQuery);
-  const targets = locations.filter(
-    (l) => (l.kind === "central" || l.kind === "so") && l.id !== row.location_id && !(row.location_kind === "central" && l.kind === "central"),
-  );
-  const [to, setTo] = useState(targets[0]?.id ?? "");
-  const [qty, setQty] = useState("");
-  const [reason, setReason] = useState("");
-  const m = useMutation({
-    mutationFn: async () => {
-      const { error } = await api.rpc("transfer_stock", {
-        p_from: row.location_id!,
-        p_to: to,
-        p_batch: row.batch_id!,
-        p_qty: Number(qty),
-        p_reason: reason,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Transfer posted");
-      qc.invalidateQueries({ queryKey: ["stock"] });
-      onClose();
-    },
-    onError: (e) => toast.error(errorMessage(e)),
-  });
-  return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
-            Transfer {row.product_name} · {row.batch_no}
-          </DialogTitle>
-        </DialogHeader>
-        <p className="text-sm text-muted-foreground">
-          From {row.location_name} (on hand <Qty value={row.qty} />)
-        </p>
-        <div className="grid gap-4">
-          <Field label="To location">
-            <NativeSelect value={to} onChange={(e) => setTo(e.target.value)}>
-              {targets.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field label="Quantity">
-            <Input
-              type="number"
-              min={1}
-              max={row.qty ?? undefined}
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-            />
-          </Field>
-          <Field label="Reason (required)">
-            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} />
-          </Field>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            onClick={() => m.mutate()}
-            disabled={m.isPending || !qty || !reason.trim() || !to}
-          >
-            Transfer
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }

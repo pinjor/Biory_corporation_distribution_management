@@ -7,16 +7,18 @@ import {
   ClipboardList,
   HandCoins,
   PackageCheck,
+  CalendarRange,
   ShoppingCart,
   Stethoscope,
   Truck,
+  Users,
   Wallet,
 } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { PageHeader, Section, StatCard, PageLoader, EmptyState } from "@/components/app/page";
+import { DateField } from "@/components/app/list-toolbar";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useSession } from "@/lib/session";
 import { formatBDT, formatBDTCompact, formatInt, rangeFor, todayBD, type RangeKey } from "@/lib/format";
@@ -90,7 +92,7 @@ function AdminDashboard() {
         description="Orders, fulfilment, receivables and stock health across all Sales Officers."
         actions={
           <>
-            <NativeSelect value={range} onChange={(e) => setRange(e.target.value as RangeKey)} className="w-36">
+            <NativeSelect leading={<CalendarRange />} value={range} onChange={(e) => setRange(e.target.value as RangeKey)} className="h-9 w-40 shrink-0" aria-label="Period">
               {RANGES.map((x) => (
                 <option key={x.key} value={x.key}>
                   {x.label}
@@ -99,8 +101,8 @@ function AdminDashboard() {
             </NativeSelect>
             {range === "custom" && (
               <>
-                <Input type="date" className="w-38" value={custom.from} onChange={(e) => setCustom({ ...custom, from: e.target.value })} />
-                <Input type="date" className="w-38" value={custom.to} max={todayBD()} onChange={(e) => setCustom({ ...custom, to: e.target.value })} />
+                <DateField label="From date" value={custom.from} onChange={(value) => setCustom({ ...custom, from: value })} />
+                <DateField label="To date" value={custom.to} max={todayBD()} onChange={(value) => setCustom({ ...custom, to: value })} />
               </>
             )}
             {s.isSuper && (
@@ -110,7 +112,7 @@ function AdminDashboard() {
                 </Link>
               </Button>
             )}
-            <NativeSelect value={so} onChange={(e) => setSo(e.target.value)} className="w-44">
+            <NativeSelect leading={<Users />} value={so} onChange={(e) => setSo(e.target.value)} className="h-9 w-44 shrink-0" aria-label="Sales officer">
               <option value="">All Sales Officers</option>
               {(sos.data ?? []).map((p) => (
                 <option key={p.id} value={p.id}>
@@ -126,20 +128,23 @@ function AdminDashboard() {
       ) : (
         <div className="flex flex-col gap-6">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-            <StatCard label="Orders" value={formatInt(data.orders_count)} hint={formatBDTCompact(data.order_value)} icon={<ShoppingCart />} />
-            <StatCard label="Delivered" value={formatBDTCompact(data.delivered_value)} icon={<Truck />} tone="info" />
-            {s.isFinance && <StatCard label="Collected" value={formatBDTCompact(data.collected_value)} icon={<HandCoins />} tone="success" />}
+            <Link to="/orders" className="block"><StatCard className="h-full hover:border-primary/40" label="Orders" value={formatInt(data.orders_count)} hint={formatBDTCompact(data.order_value)} icon={<ShoppingCart />} /></Link>
+            <Link to="/orders" className="block"><StatCard className="h-full hover:border-primary/40" label="Delivered" value={formatBDTCompact(data.delivered_value)} icon={<Truck />} tone="info" /></Link>
+            {s.isFinance && <Link to="/reports" search={{ report: "collections" }} className="block"><StatCard className="h-full hover:border-primary/40" label="Collected" value={formatBDTCompact(data.collected_value)} icon={<HandCoins />} tone="success" /></Link>}
             {s.isFinance && (
-              <StatCard
-                label="Outstanding due"
-                value={formatBDTCompact(data.outstanding_due)}
-                hint={data.overdue_due > 0 ? `${formatBDT(data.overdue_due)} overdue` : "Nothing overdue"}
-                icon={<AlertTriangle />}
-                tone={data.overdue_due > 0 ? "destructive" : "default"}
-              />
+              <Link to="/reports" search={{ report: "outstanding" }} className="block">
+                <StatCard
+                  className="h-full hover:border-primary/40"
+                  label="Outstanding due"
+                  value={formatBDTCompact(data.outstanding_due)}
+                  hint={data.overdue_due > 0 ? `${formatBDT(data.overdue_due)} overdue` : "Nothing overdue"}
+                  icon={<AlertTriangle />}
+                  tone={data.overdue_due > 0 ? "destructive" : "default"}
+                />
+              </Link>
             )}
-            {s.isFinance && <StatCard label="SO wallets" value={formatBDTCompact(data.wallet_balance)} hint="Cash held by SOs" icon={<Wallet />} tone="warning" />}
-            {s.isAdmin && <StatCard label="Doctor visits" value={formatInt(data.visits_count)} hint={`${data.new_chemists} new chemists`} icon={<Stethoscope />} />}
+            {s.isFinance && <Link to="/wallet" className="block"><StatCard className="h-full hover:border-primary/40" label="SO wallets" value={formatBDTCompact(data.wallet_balance)} hint="Cash held by SOs" icon={<Wallet />} tone="warning" /></Link>}
+            {s.isAdmin && <Link to="/visits" className="block"><StatCard className="h-full hover:border-primary/40" label="Doctor visits" value={formatInt(data.visits_count)} hint={`${data.new_chemists} new chemists`} icon={<Stethoscope />} /></Link>}
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
@@ -149,11 +154,11 @@ function AdminDashboard() {
                 <div className="p-5">
                   <EmptyState
                     title="No Sales Officers yet"
-                    description="Add a Sales Officer from Users & roles. Their orders and visits show up here."
+                    description="Add a Sales Officer from Master data. Their orders and visits show up here."
                     action={
                       s.isSuper ? (
                         <Button asChild size="sm">
-                          <Link to="/users">Manage users</Link>
+                          <Link to="/sales-officers">Sales officers</Link>
                         </Button>
                       ) : undefined
                     }
@@ -205,9 +210,9 @@ function AdminDashboard() {
               {s.isWarehouse && (
               <Section title="Stock alerts">
                 <ul className="flex flex-col gap-2 text-sm">
-                  <AlertRow to="/inventory" label="Batches near expiry" count={data.near_expiry_batches} tone="warning" />
-                  <AlertRow to="/inventory" label="Expired batches still holding stock" count={data.expired_batches} tone="destructive" />
-                  <AlertRow to="/reports" label="Products below reorder level" count={data.low_stock_products} tone="warning" />
+                  <AlertRow to="/inventory" search={{ expiry: "near" }} label="Batches near expiry" count={data.near_expiry_batches} tone="warning" />
+                  <AlertRow to="/inventory" search={{ expiry: "expired" }} label="Expired batches still holding stock" count={data.expired_batches} tone="destructive" />
+                  <AlertRow to="/reports" search={{ report: "stock" }} label="Products below reorder level" count={data.low_stock_products} tone="warning" />
                 </ul>
               </Section>
               )}
@@ -221,11 +226,13 @@ function AdminDashboard() {
 
 function AlertRow({
   to,
+  search,
   label,
   count,
   tone = "info",
 }: {
   to: "/orders" | "/deposits" | "/requisitions" | "/inventory" | "/reports";
+  search?: { expiry: "near" | "expired" } | { report: "stock" };
   label: string;
   count: number;
   tone?: "info" | "warning" | "destructive";
@@ -240,7 +247,7 @@ function AlertRow({
           : "bg-info-soft text-info";
   return (
     <li>
-      <Link to={to} className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-muted">
+      <Link to={to} {...(search ? { search: search as never } : {})} className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-muted">
         <span>{label}</span>
         <span className={`num min-w-8 rounded-md px-2 py-0.5 text-center text-xs font-semibold ${cls}`}>{count}</span>
       </Link>
@@ -296,22 +303,25 @@ function SODashboard() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <StatCard label="This month · orders" value={formatBDTCompact(m?.order_value)} hint={`${m?.orders_count ?? 0} orders`} />
-        <StatCard label="This month · collected" value={formatBDTCompact(m?.collected_value)} tone="success" />
-        <StatCard
-          label="My outstanding due"
-          value={formatBDTCompact(m?.outstanding_due)}
-          hint={m && m.overdue_due > 0 ? `${formatBDT(m.overdue_due)} overdue` : "Nothing overdue"}
-          tone={m && m.overdue_due > 0 ? "destructive" : "default"}
-        />
+        <Link to="/orders" className="block"><StatCard className="h-full hover:border-primary/40" label="This month · orders" value={formatBDTCompact(m?.order_value)} hint={`${m?.orders_count ?? 0} orders`} /></Link>
+        <Link to="/wallet" className="block"><StatCard className="h-full hover:border-primary/40" label="This month · collected" value={formatBDTCompact(m?.collected_value)} tone="success" /></Link>
+        <Link to="/reports" search={{ report: "outstanding" }} className="block">
+          <StatCard
+            className="h-full hover:border-primary/40"
+            label="My outstanding due"
+            value={formatBDTCompact(m?.outstanding_due)}
+            hint={m && m.overdue_due > 0 ? `${formatBDT(m.overdue_due)} overdue` : "Nothing overdue"}
+            tone={m && m.overdue_due > 0 ? "destructive" : "default"}
+          />
+        </Link>
       </div>
 
       {m && (m.near_expiry_batches > 0 || m.expired_batches > 0 || m.pending_order_approvals > 0) && (
         <Section title="Heads up">
           <ul className="flex flex-col gap-2 text-sm">
             {m.pending_order_approvals > 0 && <AlertRow to="/orders" label="Orders waiting for approval" count={m.pending_order_approvals} />}
-            {m.near_expiry_batches > 0 && <AlertRow to="/inventory" label="Batches in my stock near expiry" count={m.near_expiry_batches} tone="warning" />}
-            {m.expired_batches > 0 && <AlertRow to="/inventory" label="Expired batches in my stock" count={m.expired_batches} tone="destructive" />}
+            {m.near_expiry_batches > 0 && <AlertRow to="/inventory" search={{ expiry: "near" }} label="Batches in my stock near expiry" count={m.near_expiry_batches} tone="warning" />}
+            {m.expired_batches > 0 && <AlertRow to="/inventory" search={{ expiry: "expired" }} label="Expired batches in my stock" count={m.expired_batches} tone="destructive" />}
           </ul>
         </Section>
       )}

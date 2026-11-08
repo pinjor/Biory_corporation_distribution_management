@@ -132,7 +132,7 @@ async function authed(path: string, init: RequestInit): Promise<ApiResult> {
 }
 
 class Query<T = any[]> {
-  private action: "select" | "insert" | "update" = "select";
+  private action: "select" | "insert" | "update" | "delete" = "select";
   private values: Record<string, unknown> | null = null;
   private columns = "*";
   private filters: Filter[] = [];
@@ -158,6 +158,12 @@ class Query<T = any[]> {
   update(values: Record<string, unknown>) {
     this.action = "update";
     this.values = values;
+    return this;
+  }
+
+  delete() {
+    this.action = "delete";
+    this.values = {};
     return this;
   }
 
@@ -319,6 +325,12 @@ export const api = {
     },
     resetSalesOfficerPassword(userId: string, password: string) {
       return authed(`/staff/sales-officers/${userId}/password`, {
+        method: "POST",
+        body: JSON.stringify({ password }),
+      });
+    },
+    setUserPassword(userId: string, password: string) {
+      return authed(`/staff/users/${userId}/password`, {
         method: "POST",
         body: JSON.stringify({ password }),
       });

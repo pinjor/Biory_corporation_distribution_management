@@ -1,9 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Camera, HandCoins } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api/client";
+import { ListPager, usePagedRows } from "@/components/app/list-pager";
 import { PageHeader, Section, StatCard, Money, EmptyState, Field } from "@/components/app/page";
 import { NativeSelect } from "@/components/app/select-native";
 import { Button } from "@/components/ui/button";
@@ -12,20 +13,18 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { opt } from "@/lib/queries";
 import { useSession } from "@/lib/session";
-import { errorMessage, formatBDT, formatDateTime, humanize, todayBD } from "@/lib/format";
-import { downloadCsv } from "@/lib/csv";
+import { errorMessage, formatBDT, todayBD } from "@/lib/format";
 
-export const Route = createFileRoute("/_authenticated/wallet")({
-  head: () => ({ meta: [{ title: "Wallet — BIORY Corporation" }] }),
-  component: WalletPage,
+export const Route = createFileRoute("/_authenticated/wallet/")({
+  head: () => ({ meta: [{ title: "Wallet by SO — BIORY Corporation" }] }),
+  component: WalletBySoPage,
 });
 
-function WalletPage() {
+function WalletBySoPage() {
   const s = useSession();
-  const [soFilter, setSoFilter] = useState<string>("");
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const viewing = s.isFinance ? soFilter : s.userId;
-
+  const [card, setCard] = useState<"" | "held" | "pending" | "settled">("");
   const { data: summaries = [] } = useQuery({
     queryKey: ["wallet-summary"],
     queryFn: async () => {
@@ -34,56 +33,46 @@ function WalletPage() {
       return data;
     },
   });
-  const { data: ledger = [] } = useQuery({
-    queryKey: ["wallet-ledger", viewing],
-    queryFn: async () => {
-      let q = api.from("wallet_ledger").select("*, profiles!wallet_ledger_so_id_fkey(full_name)").order("created_at", { ascending: false }).limit(300);
-      if (viewing) q = q.eq("so_id", viewing);
-      const { data, error } = await q;
-      if (error) throw error;
-      return data;
-    },
+  const people = s.isFinance ? summaries : summaries.filter((row) => row.so_id === s.userId);
+  const rows = people.filter((row) => {
+    if (card === "held") return Number(row.balance) > 0;
+    if (card === "pending") return Number(row.pending) > 0;
+    if (card === "settled") return Number(row.settled) > 0;
+    return true;
   });
-
-  const mine = summaries.find((x) => x.so_id === s.userId);
-  const scope = viewing ? summaries.filter((x) => x.so_id === viewing) : summaries;
-  const agg = scope.reduce(
-    (a, x) => ({ balance: a.balance + Number(x.balance), pending: a.pending + Number(x.pending), settled: a.settled + Number(x.settled) }),
+  const page = usePagedRows(rows, card);
+  function pickCard(next: "held" | "pending" | "settled") {
+    setCard((cur) => (cur === next ? "" : next));
+  }
+  const mine = summaries.find((row) => row.so_id === s.userId);
+  const agg = people.reduce(
+    (a, row) => ({ balance: a.balance + Number(row.balance), pending: a.pending + Number(row.pending), settled: a.settled + Number(row.settled) }),
     { balance: 0, pending: 0, settled: 0 },
   );
 
   return (
     <div>
       <PageHeader
-        title={s.isFinance && !s.isSO ? "SO wallets" : "My wallet"}
-        description="A ledger, not an editable balance: collections add, deposits subtract, rejected deposits come back as reversals."
+        title="Wallet by SO"
+        description="Cash each Sales Officer is holding, what is waiting on Finance, and what has already been settled."
         actions={
-          <>
-            {s.isFinance && (
-              <NativeSelect value={soFilter} onChange={(e) => setSoFilter(e.target.value)} className="w-52">
-                <option value="">All Sales Officers</option>
-                {summaries.map((x) => <option key={x.so_id!} value={x.so_id!}>{x.full_name}</option>)}
-              </NativeSelect>
-            )}
-            {s.isSO && (
-              <Button variant="highlight" onClick={() => setOpen(true)} disabled={Number(mine?.balance ?? 0) <= 0}>
-                <HandCoins /> Deposit to company
-              </Button>
-            )}
-          </>
+          s.isSO ? (
+            <Button variant="highlight" onClick={() => setOpen(true)} disabled={Number(mine?.balance ?? 0) <= 0}>
+              <HandCoins /> Deposit to company
+            </Button>
+          ) : undefined
         }
       />
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
-        <StatCard label="Cash held by SO" value={formatBDT(agg.balance)} tone="warning" hint="Available to deposit" />
-        <StatCard label="Pending settlement" value={formatBDT(agg.pending)} tone="info" hint="Submitted, awaiting Finance" />
-        <StatCard label="Settled with company" value={formatBDT(agg.settled)} tone="success" hint="Approved deposits" />
+        <StatCard label="Cash held by SO" value={formatBDT(agg.balance)} tone="warning" hint="Available to deposit" active={card === "held"} onClick={() => pickCard("held")} />
+        <StatCard label="Pending settlement" value={formatBDT(agg.pending)} tone="info" hint="Submitted, awaiting Finance" active={card === "pending"} onClick={() => pickCard("pending")} />
+        <StatCard label="Settled with company" value={formatBDT(agg.settled)} tone="success" hint="Approved deposits" active={card === "settled"} onClick={() => pickCard("settled")} />
       </div>
-
-      {s.isFinance && !viewing && (
-        <Section title="By Sales Officer" className="mb-6" bodyClassName="p-0">
-          {summaries.length === 0 ? (
-            <div className="p-5"><EmptyState title="No Sales Officers yet" /></div>
-          ) : (
+      <Section title="By Sales Officer" bodyClassName="p-0">
+        {rows.length === 0 ? (
+          <div className="p-5"><EmptyState title="No Sales Officers yet" /></div>
+        ) : (
+          <>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -95,78 +84,26 @@ function WalletPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {summaries.map((x) => (
-                  <TableRow key={x.so_id!} className="cursor-pointer" onClick={() => setSoFilter(x.so_id!)}>
+                {page.pageRows.map((row) => (
+                  <TableRow
+                    key={row.so_id!}
+                    className="cursor-pointer"
+                    onClick={() => void navigate({ to: "/wallet/ledger", search: { so: row.so_id! } })}
+                  >
                     <TableCell>
-                      <div className="font-medium">{x.full_name}</div>
-                      <div className="num text-xs text-muted-foreground">{x.so_code}</div>
+                      <div className="font-medium">{row.full_name}</div>
+                      <div className="num text-xs text-muted-foreground">{row.so_code}</div>
                     </TableCell>
-                    <TableCell className="text-right"><Money value={x.total_collected} /></TableCell>
-                    <TableCell className="text-right font-semibold"><Money value={x.balance} /></TableCell>
-                    <TableCell className="text-right"><Money value={x.pending} /></TableCell>
-                    <TableCell className="text-right"><Money value={x.settled} /></TableCell>
+                    <TableCell className="text-right"><Money value={row.total_collected} /></TableCell>
+                    <TableCell className="text-right font-semibold"><Money value={row.balance} /></TableCell>
+                    <TableCell className="text-right"><Money value={row.pending} /></TableCell>
+                    <TableCell className="text-right"><Money value={row.settled} /></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          )}
-        </Section>
-      )}
-
-      <Section
-        title="Wallet ledger"
-        bodyClassName="p-0"
-        actions={
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() =>
-              downloadCsv("wallet-ledger.csv", [
-                ["time", "so", "type", "amount", "reference", "note"],
-                ...ledger.map((l) => [l.created_at, l.profiles?.full_name, l.entry_type, l.amount, l.reference_no, l.note]),
-              ])
-            }
-          >
-            Export
-          </Button>
-        }
-      >
-        {ledger.length === 0 ? (
-          <div className="p-5"><EmptyState title="No wallet entries yet" description="Collections from chemists show up here." /></div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>When</TableHead>
-                {s.isFinance && <TableHead>SO</TableHead>}
-                <TableHead>Entry</TableHead>
-                <TableHead>Reference</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {ledger.map((l) => (
-                <TableRow key={l.id}>
-                  <TableCell className="whitespace-nowrap text-xs">{formatDateTime(l.created_at)}</TableCell>
-                  {s.isFinance && <TableCell className="text-sm">{l.profiles?.full_name}</TableCell>}
-                  <TableCell className="text-sm">
-                    <div className="font-medium">{humanize(l.entry_type)}</div>
-                    {l.note && <div className="text-xs text-muted-foreground">{l.note}</div>}
-                  </TableCell>
-                  <TableCell className="num text-xs">
-                    {l.reference_type === "DEPOSIT" && l.reference_id ? (
-                      <Link to="/deposits/$id" params={{ id: l.reference_id }} className="text-primary hover:underline">{l.reference_no}</Link>
-                    ) : (
-                      l.reference_no
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Money value={l.amount} className={Number(l.amount) >= 0 ? "font-semibold text-success" : "font-semibold text-destructive"} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+            <ListPager page={page.page} pages={page.pages} total={page.total} pageSize={page.pageSize} noun="officers" onPage={page.setPage} onSize={page.setPageSize} />
+          </>
         )}
       </Section>
       {open && <DepositDialog balance={Number(mine?.balance ?? 0)} onClose={() => setOpen(false)} />}
@@ -197,7 +134,7 @@ function DepositDialog({ balance, onClose }: { balance: number; onClose: () => v
         const { error: upErr } = await api.storage.from("deposit-proofs").upload(path, file, { contentType: file.type, upsert: false });
         if (upErr) throw upErr;
       }
-      const { data, error } = await api.rpc("submit_deposit", {
+      const { error } = await api.rpc("submit_deposit", {
         p_amount: amt,
         p_method: f.method,
         p_provider: opt(f.provider),
@@ -210,7 +147,6 @@ function DepositDialog({ balance, onClose }: { balance: number; onClose: () => v
         p_idempotency_key: idem,
       });
       if (error) throw error;
-      return data;
     },
     onSuccess: () => {
       toast.success("Deposit submitted for Finance approval");

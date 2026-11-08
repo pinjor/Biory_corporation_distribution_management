@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000,http://localhost"
     public_app_url: str = "http://localhost:3000"
     upload_dir: str = "./data/uploads"
-    allow_signup: bool = True
+    allow_signup: bool = False
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: str = ""
     bootstrap_admin_name: str = "Super Admin"

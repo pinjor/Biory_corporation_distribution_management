@@ -43,6 +43,7 @@ create table public.profiles (
   so_code text unique,
   territory_id uuid references public.territories(id),
   active boolean not null default true,
+  avatar_path text,
   created_at timestamptz not null default now()
 );
 
@@ -290,12 +291,24 @@ create policy "notif own update" on public.notifications for update using (user_
 
 create or replace function public._notify_user(p_user uuid, p_title text, p_body text, p_link text) returns void
 language sql security definer set search_path = public as $$
-  insert into notifications(user_id, title, body, link) values (p_user, p_title, p_body, p_link)
+  insert into notifications(user_id, title, body, link)
+  select p_user, p_title, p_body, p_link
+  where p_user is not null
+    and p_user is distinct from public.current_user_id()
 $$;
 create or replace function public._notify_roles(p_roles public.app_role[], p_title text, p_body text, p_link text) returns void
 language sql security definer set search_path = public as $$
   insert into notifications(user_id, title, body, link)
-  select distinct user_id, p_title, p_body, p_link from user_roles where role = any(p_roles)
+  select distinct ur.user_id, p_title, p_body, p_link
+  from public.user_roles ur
+  where ur.user_id is distinct from public.current_user_id()
+    and (
+      ur.role = any(p_roles)
+      or (
+        ur.role = 'admin'
+        and p_roles && array['warehouse_admin','finance_admin']::public.app_role[]
+      )
+    )
 $$;
 
 create table public.audit_log (
@@ -1148,31 +1161,40 @@ create policy "visits read" on public.doctor_visits for select using (so_id = pu
 create policy "visit items read" on public.visit_items for select using (exists (select 1 from public.doctor_visits v where v.id = visit_id));
 
 create or replace function public.record_doctor_visit(p_doctor uuid, p_date date, p_start time, p_end time, p_lat numeric, p_lng numeric,
-  p_purpose text, p_notes text, p_items jsonb, p_idempotency_key uuid) returns uuid
+  p_purpose text, p_notes text, p_items jsonb, p_idempotency_key uuid, p_so uuid default null) returns uuid
 language plpgsql security definer set search_path = public as $$
-declare d doctors; v_id uuid; v_no text; it jsonb; a record; v_loc uuid; p products; v_qty int;
+declare d doctors; v_id uuid; v_no text; it jsonb; a record; v_loc uuid; p products; v_qty int; v_so uuid; v_self boolean;
 begin
   if p_idempotency_key is not null then
     select id into v_id from doctor_visits where idempotency_key = p_idempotency_key;
     if v_id is not null then return v_id; end if;
   end if;
-  if not public.has_role(public.current_user_id(), 'sales_officer') then raise exception 'Only Sales Officers can record visits'; end if;
+  v_so := coalesce(p_so, public.current_user_id());
+  if p_so is not null and p_so is distinct from public.current_user_id() then
+    if not public.has_role(public.current_user_id(), 'super_admin') then raise exception 'Not authorized'; end if;
+    if not public.has_role(p_so, 'sales_officer') then raise exception 'Choose a Sales Officer'; end if;
+  end if;
+  v_self := v_so = public.current_user_id() and public.has_role(public.current_user_id(), 'super_admin') and not public.has_role(v_so, 'sales_officer');
+  if not public.has_role(v_so, 'sales_officer') and not v_self then raise exception 'Only Sales Officers can record visits'; end if;
   select * into d from doctors where id = p_doctor;
   if d.id is null or d.status <> 'active' then raise exception 'Doctor not found or inactive'; end if;
-  if d.assigned_so is distinct from public.current_user_id() and d.created_by is distinct from public.current_user_id() then raise exception 'This doctor is not assigned to you'; end if;
+  if not v_self and d.assigned_so is distinct from v_so and d.created_by is distinct from v_so then raise exception 'This doctor is not assigned to that Sales Officer'; end if;
   if p_start is not null and p_end is not null and p_end < p_start then raise exception 'End time must be after start time'; end if;
   if p_date is not null and p_date > public.today_bd() then raise exception 'Visit date cannot be in the future'; end if;
-  v_loc := public.so_location(public.current_user_id());
-  perform 1 from locations where id = v_loc for update;
+  v_loc := public.so_location(v_so);
+  if v_loc is not null then
+    perform 1 from locations where id = v_loc for update;
+  end if;
   v_no := public.next_doc_no('VIS');
   insert into doctor_visits(visit_no, doctor_id, so_id, visit_date, start_time, end_time, latitude, longitude, purpose, notes, idempotency_key)
-  values (v_no, p_doctor, public.current_user_id(), coalesce(p_date, public.today_bd()), p_start, p_end, p_lat, p_lng, p_purpose, p_notes, p_idempotency_key)
+  values (v_no, p_doctor, v_so, coalesce(p_date, public.today_bd()), p_start, p_end, p_lat, p_lng, p_purpose, p_notes, p_idempotency_key)
   returning id into v_id;
   if p_items is not null and jsonb_typeof(p_items) = 'array' then
     for it in select * from jsonb_array_elements(p_items) loop
       v_qty := coalesce((it->>'qty')::int, 0);
       if v_qty < 0 then raise exception 'Quantities cannot be negative'; end if;
       continue when v_qty = 0;
+      if v_loc is null then raise exception 'That Sales Officer has no stock location'; end if;
       select * into p from products where id = (it->>'product_id')::uuid;
       if p.id is null or p.kind <> 'promotional' then raise exception 'Only promotional products can be given on visits'; end if;
       for a in select * from public._allocate_fefo(v_loc, p.id, v_qty) loop
@@ -1841,7 +1863,7 @@ begin
     update requisition_items set issued_qty = approved_qty where id = ri.id;
   end loop;
   update requisitions set status = 'ISSUED', issued_by = public.current_user_id(), issued_at = now() where id = p_id;
-  perform public._notify_user(r.so_id, 'Stock issued for ' || r.req_no, 'Confirm receipt to add it at the chemist or doctor', '/requisitions/' || p_id);
+  perform public._notify_user(r.so_id, 'Stock issued for ' || r.req_no, 'Check the issued lines, then receive them into your stock', '/inventory/receive/' || p_id);
 end $$;
 
 create or replace function public.receive_requisition(p_id uuid) returns void
@@ -1870,6 +1892,8 @@ begin
     end loop;
   end if;
   update requisitions set status = 'RECEIVED', received_at = now() where id = p_id;
+  perform public._notify_roles(array['warehouse_admin','super_admin']::public.app_role[],
+    'Stock received for ' || r.req_no, 'Receipt is confirmed', '/requisitions/' || p_id);
 end $$;
 
 grant select, insert, update, delete on table public.requisition_batches to biory_app;
@@ -2049,3 +2073,287 @@ grant execute on function public.central_available_stock() to biory_app;
 grant execute on function public.create_order(uuid, jsonb, numeric, numeric, text, uuid, uuid) to biory_app;
 grant execute on function public.deliver_order(uuid, jsonb, text, uuid) to biory_app;
 revoke execute on function public._central_reserved(uuid) from biory_app;
+
+-- Opening stock is saved as a pending challan. Stock increases only when it is approved.
+create table if not exists public.opening_entries (
+  id uuid primary key default gen_random_uuid(),
+  entry_no text not null unique,
+  status text not null default 'PENDING' check (status in ('PENDING','APPROVED','CANCELLED')),
+  entry_date date not null,
+  remarks text,
+  idempotency_key uuid unique,
+  created_by uuid not null references public.profiles(id),
+  created_at timestamptz not null default now(),
+  approved_by uuid references public.profiles(id),
+  approved_at timestamptz
+);
+
+create table if not exists public.opening_entry_items (
+  id uuid primary key default gen_random_uuid(),
+  entry_id uuid not null references public.opening_entries(id) on delete cascade,
+  product_id uuid not null references public.products(id),
+  batch_no text not null,
+  mfg_date date,
+  expiry_date date not null,
+  qty int not null check (qty > 0),
+  remarks text
+);
+
+create index if not exists opening_entries_status_idx on public.opening_entries (status, created_at desc);
+create index if not exists opening_entry_items_entry_idx on public.opening_entry_items (entry_id);
+
+alter table public.opening_entries enable row level security;
+alter table public.opening_entry_items enable row level security;
+
+drop policy if exists "opening entries read" on public.opening_entries;
+create policy "opening entries read" on public.opening_entries for select using (
+  public.has_any_role(public.current_user_id(), array['super_admin','admin','warehouse_admin']::public.app_role[])
+);
+
+drop policy if exists "opening items read" on public.opening_entry_items;
+create policy "opening items read" on public.opening_entry_items for select using (
+  exists (
+    select 1 from public.opening_entries e
+    where e.id = entry_id
+      and public.has_any_role(public.current_user_id(), array['super_admin','admin','warehouse_admin']::public.app_role[])
+  )
+);
+
+grant select on public.opening_entries, public.opening_entry_items to biory_app;
+
+create or replace function public.save_opening_entry(p_id uuid, p_date date, p_items jsonb, p_remarks text, p_idempotency_key uuid default null)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_id uuid; it jsonb; v_pid uuid; v_qty int; v_batch text; v_expiry date; v_mfg date;
+begin
+  if not public.has_any_role(public.current_user_id(), array['super_admin','admin','warehouse_admin']::public.app_role[]) then
+    raise exception 'Not authorized';
+  end if;
+  if p_idempotency_key is not null and p_id is null then
+    select id into v_id from public.opening_entries where idempotency_key = p_idempotency_key;
+    if v_id is not null then return v_id; end if;
+  end if;
+  if p_date is null then raise exception 'Entry date is required'; end if;
+  if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then raise exception 'Add at least one item'; end if;
+  if p_id is null then
+    insert into public.opening_entries(entry_no, status, entry_date, remarks, idempotency_key, created_by)
+    values (public.next_doc_no('OPN'), 'PENDING', p_date, nullif(trim(coalesce(p_remarks, '')), ''), p_idempotency_key, public.current_user_id())
+    returning id into v_id;
+  else
+    select id into v_id from public.opening_entries where id = p_id for update;
+    if v_id is null then raise exception 'Opening entry not found'; end if;
+    if (select status from public.opening_entries where id = v_id) <> 'PENDING' then
+      raise exception 'Only a pending opening entry can be edited';
+    end if;
+    update public.opening_entries
+      set entry_date = p_date, remarks = nullif(trim(coalesce(p_remarks, '')), '')
+      where id = v_id;
+    delete from public.opening_entry_items where entry_id = v_id;
+  end if;
+  for it in select * from jsonb_array_elements(p_items) loop
+    v_pid := (it->>'product_id')::uuid;
+    v_qty := coalesce((it->>'qty')::int, 0);
+    v_batch := trim(coalesce(it->>'batch_no', ''));
+    v_expiry := nullif(it->>'expiry', '')::date;
+    v_mfg := nullif(it->>'mfg', '')::date;
+    if v_qty <= 0 then raise exception 'Quantity must be greater than zero'; end if;
+    if v_batch = '' then raise exception 'Batch number is required'; end if;
+    if v_expiry is null then raise exception 'Expiry date is required'; end if;
+    if v_expiry <= public.today_bd() then raise exception 'Cannot receive an expired batch'; end if;
+    if v_mfg is not null and v_mfg > public.today_bd() then raise exception 'Manufacturing date cannot be in the future'; end if;
+    if not exists (select 1 from public.products where id = v_pid and active) then raise exception 'Unknown or inactive product'; end if;
+    insert into public.opening_entry_items(entry_id, product_id, batch_no, mfg_date, expiry_date, qty, remarks)
+    values (v_id, v_pid, v_batch, v_mfg, v_expiry, v_qty, nullif(trim(coalesce(it->>'remarks', '')), ''));
+  end loop;
+  perform public._notify_roles(array['warehouse_admin','super_admin']::public.app_role[],
+    'Opening ' || (select entry_no from public.opening_entries where id = v_id) || ' awaiting approval',
+    'Stock is added only after approval', '/inventory/opening');
+  return v_id;
+end $$;
+
+create or replace function public.cancel_opening_entry(p_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare r public.opening_entries;
+begin
+  if not public.has_any_role(public.current_user_id(), array['super_admin','admin','warehouse_admin']::public.app_role[]) then
+    raise exception 'Not authorized';
+  end if;
+  select * into r from public.opening_entries where id = p_id for update;
+  if r.id is null then raise exception 'Opening entry not found'; end if;
+  if r.status <> 'PENDING' then raise exception 'Only a pending opening entry can be deleted'; end if;
+  update public.opening_entries set status = 'CANCELLED' where id = p_id;
+end $$;
+
+create or replace function public.approve_opening_entry(p_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare r public.opening_entries; line public.opening_entry_items;
+begin
+  if not public.has_any_role(public.current_user_id(), array['super_admin','admin','warehouse_admin']::public.app_role[]) then
+    raise exception 'Not authorized';
+  end if;
+  select * into r from public.opening_entries where id = p_id for update;
+  if r.id is null then raise exception 'Opening entry not found'; end if;
+  if r.status <> 'PENDING' then raise exception 'Only a pending opening entry can be approved'; end if;
+  for line in select * from public.opening_entry_items where entry_id = p_id loop
+    perform public.receive_stock(line.product_id, line.batch_no, line.mfg_date, line.expiry_date, line.qty, 'OPENING', r.entry_no, line.remarks);
+  end loop;
+  update public.opening_entries
+    set status = 'APPROVED', approved_by = public.current_user_id(), approved_at = now()
+    where id = p_id;
+  perform public._notify_user(r.created_by, 'Opening ' || r.entry_no || ' approved',
+    'The quantity has been added to the central warehouse', '/inventory/opening');
+end $$;
+
+grant execute on function public.save_opening_entry(uuid, date, jsonb, text, uuid) to biory_app;
+grant execute on function public.cancel_opening_entry(uuid) to biory_app;
+grant execute on function public.approve_opening_entry(uuid) to biory_app;
+
+-- Stock adjustments are saved pending. See backend/sql/09_z_adjustment_entries.sql for the same functions on an existing database.
+create table if not exists public.adjustment_entries (
+  id uuid primary key default gen_random_uuid(),
+  entry_no text not null unique,
+  status text not null default 'PENDING' check (status in ('PENDING','APPROVED','CANCELLED')),
+  entry_date date not null,
+  location_id uuid not null references public.locations(id),
+  remarks text,
+  idempotency_key uuid unique,
+  created_by uuid not null references public.profiles(id),
+  created_at timestamptz not null default now(),
+  approved_by uuid references public.profiles(id),
+  approved_at timestamptz
+);
+
+create table if not exists public.adjustment_entry_items (
+  id uuid primary key default gen_random_uuid(),
+  entry_id uuid not null references public.adjustment_entries(id) on delete cascade,
+  product_id uuid not null references public.products(id),
+  batch_id uuid not null references public.batches(id),
+  movement_type text not null check (movement_type in ('DAMAGE','EXPIRED','LOSS','MANUAL_ADJUSTMENT_OUT','MANUAL_ADJUSTMENT_IN','CUSTOMER_RETURN')),
+  qty int not null check (qty > 0),
+  reason text not null,
+  remarks text
+);
+
+create index if not exists adjustment_entries_status_idx on public.adjustment_entries (status, created_at desc);
+create index if not exists adjustment_entry_items_entry_idx on public.adjustment_entry_items (entry_id);
+
+alter table public.adjustment_entries enable row level security;
+alter table public.adjustment_entry_items enable row level security;
+
+drop policy if exists "adjustment entries read" on public.adjustment_entries;
+create policy "adjustment entries read" on public.adjustment_entries for select using (
+  public.has_any_role(public.current_user_id(), array['super_admin','admin','warehouse_admin']::public.app_role[])
+);
+
+drop policy if exists "adjustment items read" on public.adjustment_entry_items;
+create policy "adjustment items read" on public.adjustment_entry_items for select using (
+  exists (
+    select 1 from public.adjustment_entries e
+    where e.id = entry_id
+      and public.has_any_role(public.current_user_id(), array['super_admin','admin','warehouse_admin']::public.app_role[])
+  )
+);
+
+grant select on public.adjustment_entries, public.adjustment_entry_items to biory_app;
+
+create or replace function public.save_adjustment_entry(p_id uuid, p_date date, p_location uuid, p_items jsonb, p_remarks text, p_idempotency_key uuid default null)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_id uuid; it jsonb; v_pid uuid; v_batch uuid; v_qty int; v_type text; v_reason text; v_out int; v_on int;
+begin
+  if not public.has_any_role(public.current_user_id(), array['super_admin','admin','warehouse_admin']::public.app_role[]) then
+    raise exception 'Not authorized';
+  end if;
+  if p_idempotency_key is not null and p_id is null then
+    select id into v_id from public.adjustment_entries where idempotency_key = p_idempotency_key;
+    if v_id is not null then return v_id; end if;
+  end if;
+  if p_date is null then raise exception 'Entry date is required'; end if;
+  if p_location is null or not exists (select 1 from public.locations where id = p_location and kind in ('central','so')) then
+    raise exception 'Choose a store';
+  end if;
+  if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then raise exception 'Add at least one item'; end if;
+  if p_id is null then
+    insert into public.adjustment_entries(entry_no, status, entry_date, location_id, remarks, idempotency_key, created_by)
+    values (public.next_doc_no('ADJ'), 'PENDING', p_date, p_location, nullif(trim(coalesce(p_remarks, '')), ''), p_idempotency_key, public.current_user_id())
+    returning id into v_id;
+  else
+    select id into v_id from public.adjustment_entries where id = p_id for update;
+    if v_id is null then raise exception 'Adjustment not found'; end if;
+    if (select status from public.adjustment_entries where id = v_id) <> 'PENDING' then
+      raise exception 'Only a pending adjustment can be edited';
+    end if;
+    update public.adjustment_entries
+      set entry_date = p_date, location_id = p_location, remarks = nullif(trim(coalesce(p_remarks, '')), '')
+      where id = v_id;
+    delete from public.adjustment_entry_items where entry_id = v_id;
+  end if;
+  for it in select * from jsonb_array_elements(p_items) loop
+    v_pid := (it->>'product_id')::uuid;
+    v_batch := (it->>'batch_id')::uuid;
+    v_qty := coalesce((it->>'qty')::int, 0);
+    v_type := it->>'movement_type';
+    v_reason := trim(coalesce(it->>'reason', ''));
+    if v_qty <= 0 then raise exception 'Quantity must be greater than zero'; end if;
+    if v_reason = '' then raise exception 'A reason is required'; end if;
+    if v_type not in ('DAMAGE','EXPIRED','LOSS','MANUAL_ADJUSTMENT_OUT','MANUAL_ADJUSTMENT_IN','CUSTOMER_RETURN') then
+      raise exception 'Invalid adjustment type';
+    end if;
+    if not exists (select 1 from public.batches where id = v_batch and product_id = v_pid) then
+      raise exception 'Batch does not belong to that product';
+    end if;
+    if v_type in ('DAMAGE','EXPIRED','LOSS','MANUAL_ADJUSTMENT_OUT') then
+      select coalesce(sum(qty), 0) into v_out from public.adjustment_entry_items
+        where entry_id = v_id and batch_id = v_batch
+          and movement_type in ('DAMAGE','EXPIRED','LOSS','MANUAL_ADJUSTMENT_OUT');
+      select coalesce(qty, 0) into v_on from public.stock_balances
+        where location_id = p_location and batch_id = v_batch;
+      if v_out + v_qty > coalesce(v_on, 0) then raise exception 'Not enough stock in that batch to decrease'; end if;
+    end if;
+    insert into public.adjustment_entry_items(entry_id, product_id, batch_id, movement_type, qty, reason, remarks)
+    values (v_id, v_pid, v_batch, v_type, v_qty, v_reason, nullif(trim(coalesce(it->>'remarks', '')), ''));
+  end loop;
+  perform public._notify_roles(array['warehouse_admin','super_admin']::public.app_role[],
+    'Adjustment ' || (select entry_no from public.adjustment_entries where id = v_id) || ' awaiting approval',
+    'Stock changes only after approval', '/inventory/adjust');
+  return v_id;
+end $$;
+
+create or replace function public.cancel_adjustment_entry(p_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare r public.adjustment_entries;
+begin
+  if not public.has_any_role(public.current_user_id(), array['super_admin','admin','warehouse_admin']::public.app_role[]) then
+    raise exception 'Not authorized';
+  end if;
+  select * into r from public.adjustment_entries where id = p_id for update;
+  if r.id is null then raise exception 'Adjustment not found'; end if;
+  if r.status <> 'PENDING' then raise exception 'Only a pending adjustment can be deleted'; end if;
+  update public.adjustment_entries set status = 'CANCELLED' where id = p_id;
+end $$;
+
+create or replace function public.approve_adjustment_entry(p_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare r public.adjustment_entries; line public.adjustment_entry_items; v_reason text;
+begin
+  if not public.has_any_role(public.current_user_id(), array['super_admin','admin','warehouse_admin']::public.app_role[]) then
+    raise exception 'Not authorized';
+  end if;
+  select * into r from public.adjustment_entries where id = p_id for update;
+  if r.id is null then raise exception 'Adjustment not found'; end if;
+  if r.status <> 'PENDING' then raise exception 'Only a pending adjustment can be approved'; end if;
+  for line in select * from public.adjustment_entry_items where entry_id = p_id loop
+    v_reason := r.entry_no
+      || case when r.remarks is not null then ' · ' || r.remarks else '' end
+      || ' · ' || line.reason
+      || case when line.remarks is not null then ' · ' || line.remarks else '' end;
+    perform public.adjust_stock(r.location_id, line.batch_id, line.qty, line.movement_type, v_reason);
+  end loop;
+  update public.adjustment_entries
+    set status = 'APPROVED', approved_by = public.current_user_id(), approved_at = now()
+    where id = p_id;
+  perform public._notify_user(r.created_by, 'Adjustment ' || r.entry_no || ' approved',
+    'The store stock has been updated', '/inventory/adjust');
+end $$;
+
+grant execute on function public.save_adjustment_entry(uuid, date, uuid, jsonb, text, uuid) to biory_app;
+grant execute on function public.cancel_adjustment_entry(uuid) to biory_app;
+grant execute on function public.approve_adjustment_entry(uuid) to biory_app;

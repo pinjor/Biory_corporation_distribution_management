@@ -58,6 +58,21 @@ async def create_sales_officer(body: SalesOfficerIn, ctx: Ctx = Depends(get_ctx)
     return {"data": {"id": str(user_id)}}
 
 
+@router.post("/users/{user_id}/password")
+async def set_user_password(user_id: UUID, body: PasswordIn, ctx: Ctx = Depends(get_ctx)) -> dict:
+    _super(ctx)
+    try:
+        await ctx.conn.execute(
+            "select public.set_user_password($1, $2, $3)",
+            user_id,
+            hash_password(body.password),
+            body.password,
+        )
+    except asyncpg.PostgresError as exc:
+        raise postgres_error(exc) from exc
+    return {"data": {"ok": True}}
+
+
 @router.post("/sales-officers/{user_id}/password")
 async def reset_sales_officer_password(user_id: UUID, body: PasswordIn, ctx: Ctx = Depends(get_ctx)) -> dict:
     _super(ctx)
