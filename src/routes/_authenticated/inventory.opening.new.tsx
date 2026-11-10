@@ -13,6 +13,7 @@ import { SearchField } from "@/components/app/list-toolbar";
 import { locationsQuery, opt, productsQuery } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { errorMessage, formatDate, todayBD } from "@/lib/format";
+import { newId } from "@/lib/id";
 
 export const Route = createFileRoute("/_authenticated/inventory/opening/new")({
   validateSearch: (s: Record<string, unknown>): { edit?: string } =>
@@ -62,7 +63,7 @@ function OpeningEntry() {
   const { edit } = Route.useSearch();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const idem = useRef(crypto.randomUUID());
+  const idem = useRef(newId());
   const { data: products = [] } = useQuery(productsQuery);
   const { data: locations = [] } = useQuery(locationsQuery);
   const central = useMemo(
@@ -182,7 +183,7 @@ function OpeningEntry() {
       return;
     }
     setLines((cur) => [...cur, {
-      key: crypto.randomUUID(),
+      key: newId(),
       productId: id,
       batch: batch.trim(),
       mfg,

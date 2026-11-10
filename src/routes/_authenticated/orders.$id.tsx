@@ -17,6 +17,7 @@ import { ReasonDialog } from "@/components/app/reason-dialog";
 import { useSession } from "@/lib/session";
 import { round2 } from "@/lib/pricing";
 import { addDays, errorMessage, formatDate, formatDateTime, formatPct, todayBD } from "@/lib/format";
+import { newId } from "@/lib/id";
 import { downloadOrderReport, type OrderReport } from "@/lib/order-report";
 
 export const Route = createFileRoute("/_authenticated/orders/$id")({
@@ -320,7 +321,7 @@ function DeliverDialog({ order, onClose, onDone }: { order: Order; onClose: () =
   const [mode, setMode] = useState<"FULL" | "PARTIAL">("FULL");
   const [now, setNow] = useState<Record<string, number>>(() => Object.fromEntries(open.map((i) => [i.id, i.qty - i.delivered_qty])));
   const [remarks, setRemarks] = useState("");
-  const [idem] = useState(() => crypto.randomUUID());
+  const [idem] = useState(() => newId());
   const qtyFor = (i: (typeof open)[number]) => (mode === "FULL" ? i.qty - i.delivered_qty : (now[i.id] ?? 0));
   const value = round2(open.reduce((a, i) => a + qtyFor(i) * Number(i.net_unit_price), 0));
   const short = open.filter((i) => qtyFor(i) > (onHand.get(i.product_id) ?? 0));
@@ -421,7 +422,7 @@ function CollectDialog({ order, onClose, onDone }: { order: Order; onClose: () =
   const [reference, setReference] = useState("");
   const [date, setDate] = useState(todayBD());
   const [remarks, setRemarks] = useState("");
-  const [idem] = useState(() => crypto.randomUUID());
+  const [idem] = useState(() => newId());
   const amt = mode === "FULL" ? due : Number(amount) || 0;
   const m = useMutation({
     mutationFn: async () => {

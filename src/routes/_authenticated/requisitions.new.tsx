@@ -15,6 +15,7 @@ import { opt, productsQuery, locationsQuery, salesOfficersQuery } from "@/lib/qu
 import { NativeSelect } from "@/components/app/select-native";
 import { useSession } from "@/lib/session";
 import { errorMessage, todayBD } from "@/lib/format";
+import { newId } from "@/lib/id";
 
 export const Route = createFileRoute("/_authenticated/requisitions/new")({
   validateSearch: (s: Record<string, unknown>): { edit?: string } =>
@@ -197,7 +198,7 @@ function NewRequisition() {
     if (!name) return;
     const kept = lines.filter((line) => line.qty > 0);
     const next = templates.filter((row) => row.name.toLowerCase() !== name.toLowerCase());
-    next.push({ id: crypto.randomUUID(), name, lines: kept });
+    next.push({ id: newId(), name, lines: kept });
     storeTemplates(next);
     setTemplateName("");
     setSaveOpen(false);

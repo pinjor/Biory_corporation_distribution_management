@@ -70,6 +70,7 @@ import { menuAllowed } from "@/lib/access";
 import type { ReportKey } from "@/routes/_authenticated/reports";
 import { ROLE_LABELS, useSession } from "@/lib/session";
 import { errorMessage, formatDateTime } from "@/lib/format";
+import { newId } from "@/lib/id";
 import { OfflineProvider, useOffline } from "@/components/app/offline-provider";
 import { ProfilePhoto } from "@/components/app/profile-photo";
 import { SyncStatusChip } from "@/components/app/sync-status";
@@ -511,7 +512,7 @@ function ProfileDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
         }
         if (file.size > 4 * 1024 * 1024) throw new Error("Photo must be 4 MB or smaller");
         const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-        path = `${session.userId}/${crypto.randomUUID()}.${ext}`;
+        path = `${session.userId}/${newId()}.${ext}`;
         const { error } = await api.storage.from("profile-photos").upload(path, file, { contentType: file.type });
         if (error) throw error;
       }

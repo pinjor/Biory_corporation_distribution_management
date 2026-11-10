@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Eye, EyeOff, Pencil, Plus, Trash2 } from "lucide-react";
+import { Eye, EyeOff, KeyRound, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api/client";
 import { ConfirmDelete } from "@/components/app/confirm-delete";
@@ -46,6 +46,7 @@ function SalesOfficersPage() {
     },
   });
   const [edit, setEdit] = useState<Partial<Officer> | null>(null);
+  const [resetOfficer, setResetOfficer] = useState<Officer | null>(null);
   const [remove, setRemove] = useState<Officer | null>(null);
   const [q, setQ] = useState("");
   const { from, to, setFrom, setTo, reset } = useListRange();
@@ -77,6 +78,7 @@ function SalesOfficersPage() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Username</TableHead>
+                <TableHead>Password</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Territory</TableHead>
                 <TableHead>Status</TableHead>
@@ -91,10 +93,16 @@ function SalesOfficersPage() {
                     {row.so_code && <div className="num text-xs text-muted-foreground">{row.so_code}</div>}
                   </TableCell>
                   <TableCell className="num text-sm">{row.email}</TableCell>
+                  <TableCell>
+                    <PasswordReveal value={row.login_password} />
+                  </TableCell>
                   <TableCell className="text-sm">{row.phone || "—"}</TableCell>
                   <TableCell className="text-sm">{row.territory_id ? territoryName.get(row.territory_id) ?? "—" : "—"}</TableCell>
                   <TableCell><StatusBadge status={row.active ? "active" : "inactive"} /></TableCell>
                   <TableCell className="whitespace-nowrap text-right">
+                    <Button variant="ghost" size="icon" aria-label={`Reset password for ${row.full_name}`} onClick={() => setResetOfficer(row)}>
+                      <KeyRound />
+                    </Button>
                     <Button variant="ghost" size="icon" aria-label={`Edit ${row.full_name}`} onClick={() => setEdit(row)}>
                       <Pencil />
                     </Button>
@@ -111,6 +119,7 @@ function SalesOfficersPage() {
         )}
       </Section>
       {edit && <OfficerDialog row={edit} territories={territories} onClose={() => setEdit(null)} onSaved={refresh} />}
+      {resetOfficer && <ResetPasswordDialog officer={resetOfficer} onClose={() => setResetOfficer(null)} onSaved={refresh} />}
       {remove && (
         <ConfirmDelete
           title={`Delete ${remove.full_name || remove.email}?`}
@@ -124,6 +133,74 @@ function SalesOfficersPage() {
         />
       )}
     </div>
+  );
+}
+
+function PasswordReveal({ value }: { value: string | null }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="flex items-center gap-1">
+      <span className="inline-block w-28 truncate font-mono text-xs">{value ? (show ? value : "••••••••") : "Not on file"}</span>
+      <Button type="button" variant="ghost" size="icon" className="size-8" disabled={!value} aria-label={show ? "Hide password" : "Show password"} onClick={() => setShow((v) => !v)}>
+        {show ? <EyeOff /> : <Eye />}
+      </Button>
+    </div>
+  );
+}
+
+function ResetPasswordDialog({ officer, onClose, onSaved }: { officer: Officer; onClose: () => void; onSaved: () => void }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [show, setShow] = useState(false);
+  const [pending, setPending] = useState(false);
+
+  async function save() {
+    if (password.length < 8) {
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+    if (password !== confirm) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    setPending(true);
+    const { error } = await api.staff.resetSalesOfficerPassword(officer.id, password);
+    setPending(false);
+    if (error) {
+      toast.error(errorMessage(error));
+      return;
+    }
+    toast.success("Password reset");
+    onSaved();
+    onClose();
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Reset password</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">Set a new password for {officer.full_name || officer.email}.</p>
+        <div className="grid gap-4">
+          <Field label="New password">
+            <div className="relative">
+              <Input type={show ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" placeholder="At least 8 characters" className="pr-10" />
+              <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" onClick={() => setShow((v) => !v)} aria-label={show ? "Hide password" : "Show password"}>
+                {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
+          </Field>
+          <Field label="Confirm password">
+            <Input type={show ? "text" : "password"} value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" placeholder="Type the new password again" />
+          </Field>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={pending}>{pending ? "Saving…" : "Reset password"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

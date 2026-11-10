@@ -154,6 +154,7 @@ begin
 end $$;
 
 drop function if exists public.submit_requisition(jsonb, text);
+drop function if exists public.submit_requisition(jsonb, text, text, uuid);
 
 create or replace function public.submit_requisition(p_items jsonb, p_remarks text, p_party_kind text, p_party_id uuid)
 returns uuid language plpgsql security definer set search_path = public as $$

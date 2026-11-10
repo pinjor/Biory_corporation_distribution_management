@@ -14,6 +14,7 @@ import { SearchField } from "@/components/app/list-toolbar";
 import { locationsQuery, opt, productsQuery } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { errorMessage, formatDate, todayBD } from "@/lib/format";
+import { newId } from "@/lib/id";
 
 export const Route = createFileRoute("/_authenticated/inventory/adjust/new")({
   validateSearch: (s: Record<string, unknown>): { edit?: string } =>
@@ -53,7 +54,7 @@ function AdjustPage() {
   const s = useSession();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const idem = useRef(crypto.randomUUID());
+  const idem = useRef(newId());
   const { data: locations = [] } = useQuery(locationsQuery);
   const { data: products = [] } = useQuery(productsQuery);
   const central = locations.find((l) => l.kind === "central");
@@ -182,7 +183,7 @@ function AdjustPage() {
       return;
     }
     setLines((cur) => [...cur, {
-      key: crypto.randomUUID(),
+      key: newId(),
       productId: id,
       batchId,
       batchNo: batch.batch_no ?? "",

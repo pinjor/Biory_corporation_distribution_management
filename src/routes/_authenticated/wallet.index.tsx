@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { opt } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { errorMessage, formatBDT, todayBD } from "@/lib/format";
+import { newId } from "@/lib/id";
 
 export const Route = createFileRoute("/_authenticated/wallet/")({
   head: () => ({ meta: [{ title: "Wallet by SO — BIORY Corporation" }] }),
@@ -119,7 +120,7 @@ function DepositDialog({ balance, onClose }: { balance: number; onClose: () => v
   const qc = useQueryClient();
   const [f, setF] = useState({ amount: String(balance), method: "BANK", provider: "", account: "", txn: "", date: todayBD(), receivedBy: "", remarks: "" });
   const [file, setFile] = useState<File | null>(null);
-  const [idem] = useState(() => crypto.randomUUID());
+  const [idem] = useState(() => newId());
   const set = (k: keyof typeof f, v: string) => setF((x) => ({ ...x, [k]: v }));
   const amt = Number(f.amount) || 0;
 
@@ -130,7 +131,7 @@ function DepositDialog({ balance, onClose }: { balance: number; onClose: () => v
         const ext = OK_TYPES[file.type];
         if (!ext) throw new Error("Proof must be a JPG, PNG, WEBP image or a PDF");
         if (file.size > MAX_BYTES) throw new Error("Proof must be 5 MB or smaller");
-        path = `${s.userId}/${crypto.randomUUID()}.${ext}`;
+        path = `${s.userId}/${newId()}.${ext}`;
         const { error: upErr } = await api.storage.from("deposit-proofs").upload(path, file, { contentType: file.type, upsert: false });
         if (upErr) throw upErr;
       }

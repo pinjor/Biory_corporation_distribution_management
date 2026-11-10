@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { masterValuesQuery } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { errorMessage, todayBD } from "@/lib/format";
+import { newId } from "@/lib/id";
 import { compressReceipt, EXPENSE_CATEGORIES, RECEIPT_MAX_FILES, RECEIPT_TYPES, receiptProblem } from "@/lib/expenses";
 
 export const Route = createFileRoute("/_authenticated/expenses/new")({
@@ -32,7 +33,7 @@ function NewExpense() {
   const online = useOnline();
   const [f, setF] = useState({ date: todayBD(), category: "TRAVEL", amount: "", description: "" });
   const [files, setFiles] = useState<File[]>([]);
-  const [idem] = useState(() => crypto.randomUUID());
+  const [idem] = useState(() => newId());
   const set = (k: keyof typeof f, v: string) => setF((x) => ({ ...x, [k]: v }));
   const amt = Number(f.amount) || 0;
 
@@ -54,7 +55,7 @@ function NewExpense() {
       if (problem) throw new Error(problem);
       const paths: string[] = [];
       for (const file of files) {
-        const path = `${s.userId}/${crypto.randomUUID()}.${RECEIPT_TYPES[file.type]}`;
+        const path = `${s.userId}/${newId()}.${RECEIPT_TYPES[file.type]}`;
         const { error } = await api.storage.from("expense-receipts").upload(path, file, { contentType: file.type, upsert: false });
         if (error) throw new Error(`Couldn't upload ${file.name}: ${error.message}`);
         paths.push(path);

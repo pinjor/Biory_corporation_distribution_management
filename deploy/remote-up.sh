@@ -143,6 +143,9 @@ for sql in backend/sql/0[2-9]_*.sql backend/sql/1[0-9]_*.sql; do
   docker compose exec -T postgres psql -U biory_owner -d biory -v ON_ERROR_STOP=1 < "$sql"
 done
 
+# Nginx resolves container addresses only at start. Recreated API and web containers need a fresh gateway.
+docker compose restart gateway
+
 echo "Waiting for the API..."
 ok=0
 for _ in $(seq 1 40); do

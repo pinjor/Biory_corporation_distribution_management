@@ -403,6 +403,13 @@ export const api = {
       const result = await raw("/auth/forgot", { method: "POST", body: JSON.stringify({ email }) });
       return { data: {}, error: result.error };
     },
+    async resetOwnPassword(email: string, password: string) {
+      const result = await raw("/auth/self-reset", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+      return { data: result.error ? null : { ok: true }, error: result.error };
+    },
     async updateUser({ password }: { password: string }) {
       const token = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("token") : null;
       if (token) {

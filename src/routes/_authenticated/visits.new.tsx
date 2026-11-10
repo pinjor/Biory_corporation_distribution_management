@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { myAvailableStockQuery, opt, productsQuery, salesOfficersQuery } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { errorMessage, todayBD } from "@/lib/format";
+import { newId } from "@/lib/id";
 
 export const Route = createFileRoute("/_authenticated/visits/new")({
   validateSearch: (s: Record<string, unknown>): { doctor?: string } => (typeof s["doctor"] === "string" ? { doctor: s["doctor"] } : {}),
@@ -66,7 +67,7 @@ function NewVisit() {
   const [purpose, setPurpose] = useState("Product detailing");
   const [notes, setNotes] = useState("");
   const [qty, setQty] = useState<Record<string, number>>({});
-  const [idem] = useState(() => crypto.randomUUID());
+  const [idem] = useState(() => newId());
   const onHand = new Map(stock.map((r) => [r.product_id, r.on_hand]));
   const promos = products.filter((p) => p.kind === "promotional" && p.active);
   const items = Object.entries(qty).filter(([, v]) => v > 0);

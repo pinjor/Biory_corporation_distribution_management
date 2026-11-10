@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api/client";
 import { ATTENDANCE_LABEL, attendanceKind, formatHours } from "@/lib/attendance";
 import { errorMessage, formatDate, todayBD } from "@/lib/format";
+import { newId } from "@/lib/id";
 import { useSession } from "@/lib/session";
 import { PageHeader, StatusBadge } from "@/components/app/page";
 import { ProfilePhoto } from "@/components/app/profile-photo";
@@ -50,7 +51,7 @@ function PunchPage() {
   const punch = useMutation({
     mutationFn: async (which: "in" | "out") => {
       const { data, error } = await api.rpc(which === "in" ? "punch_in" : "punch_out", {
-        p_idempotency_key: crypto.randomUUID(),
+        p_idempotency_key: newId(),
       });
       if (error) throw error;
       return data;

@@ -6,12 +6,13 @@ import smtplib
 from email.message import EmailMessage
 from uuid import UUID
 
+import asyncpg
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
 from app.config import settings
 from app.deps import Ctx, get_ctx
-from app.errors import ApiError
+from app.errors import ApiError, postgres_error
 from app.security import encode_access, hash_password, needs_rehash, new_refresh_token, token_hash, verify_password
 
 log = logging.getLogger("biory.auth")
@@ -47,6 +48,11 @@ class ResetIn(BaseModel):
 
 
 class PasswordIn(BaseModel):
+    password: str = Field(min_length=8, max_length=128)
+
+
+class SelfResetIn(BaseModel):
+    email: str = Field(min_length=3, max_length=200)
     password: str = Field(min_length=8, max_length=128)
 
 
@@ -207,6 +213,25 @@ async def change_password(body: PasswordIn, request: Request, ctx: Ctx = Depends
     await ctx.conn.execute("select public.forget_displayed_password($1)", ctx.user_id)
     await _revoke(request.app.state.redis, str(ctx.user_id))
     return await _issue(request, ctx.user_id, ctx.email)
+
+
+@router.post("/self-reset")
+async def self_reset(body: SelfResetIn, request: Request) -> dict:
+    await _limit(request, "self-reset", 5)
+    email = _email(body.email)
+    try:
+        async with request.app.state.pool.acquire() as conn:
+            user_id = await conn.fetchval(
+                "select public.reset_own_sales_officer_password($1, $2, $3)",
+                email,
+                hash_password(body.password),
+                body.password,
+            )
+    except asyncpg.PostgresError as exc:
+        raise postgres_error(exc) from exc
+    if user_id is not None:
+        await _revoke(request.app.state.redis, str(user_id))
+    return {"ok": True}
 
 
 @router.post("/reset")

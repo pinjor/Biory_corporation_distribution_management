@@ -2,17 +2,19 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, ClipboardList, CloudOff, Info, Minus, Package, Pencil, Plus, Save, Search, ShoppingCart, Store } from "lucide-react";
+import { Check, ChevronDown, ClipboardList, CloudOff, Info, Package, Pencil, Plus, Save, ShoppingCart, Store, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api/client";
-import { PageHeader, Money, Qty, Field, EmptyState, PageLoader } from "@/components/app/page";
+import { PageHeader, Money, Field, EmptyState, PageLoader } from "@/components/app/page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { myAvailableStockQuery, opt, productsQuery, settingsQuery } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 import { checkDiscounts, computeOrderTotals } from "@/lib/pricing";
+import { ProductSearch } from "@/components/app/product-search";
 import { errorMessage } from "@/lib/format";
+import { newId } from "@/lib/id";
 import { useOffline } from "@/components/app/offline-provider";
 import { classifyRpcError, queuedQtyByProduct } from "@/lib/offline/outbox";
 import { ORDER_DRAFT_KEY as DRAFT_KEY, type OrderDraft as Draft } from "@/lib/offline/order-draft";
@@ -26,6 +28,19 @@ export const Route = createFileRoute("/_authenticated/orders/new")({
   head: () => ({ meta: [{ title: "New order — BIORY Corporation" }] }),
   component: NewOrder,
 });
+
+type LineRow = { key: string; productId: string; qty: string };
+
+function blankRow(): LineRow {
+  return { key: newId(), productId: "", qty: "" };
+}
+
+function rowsFromQty(saved: Record<string, number>): LineRow[] {
+  const filled = Object.entries(saved)
+    .filter(([, value]) => value > 0)
+    .map(([id, value]) => ({ key: id, productId: id, qty: String(value) }));
+  return filled.length > 0 ? [...filled, blankRow()] : [blankRow()];
+}
 
 type EditableOrder = {
   id: string;
@@ -97,11 +112,19 @@ function NewOrder() {
     },
   });
 
-  const [qty, setQty] = useState<Record<string, number>>({});
+  const [rows, setRows] = useState<LineRow[]>(() => [blankRow()]);
+  const qty = useMemo(() => {
+    const next: Record<string, number> = {};
+    for (const row of rows) {
+      const amount = Math.max(0, Math.floor(Number(row.qty) || 0));
+      if (row.productId && amount > 0) next[row.productId] = (next[row.productId] ?? 0) + amount;
+    }
+    return next;
+  }, [rows]);
   const [soPct, setSoPct] = useState("0");
   const [extraPct, setExtraPct] = useState("0");
   const [remarks, setRemarks] = useState("");
-  const [idemKey] = useState(() => crypto.randomUUID());
+  const [idemKey] = useState(() => newId());
   const [restored, setRestored] = useState(false);
 
   // Offline-friendly: keep a new order as a local draft. An edit loads the saved order and must not pick up that draft.
@@ -116,7 +139,7 @@ function NewOrder() {
         const d = JSON.parse(raw) as Draft;
         if (!search.chemist || d.chemist === search.chemist) {
           setChemist(d.chemist || search.chemist || "");
-          setQty(d.qty ?? {});
+          setRows(rowsFromQty(d.qty ?? {}));
           setSoPct(d.so ?? "0");
           setExtraPct(d.extra ?? "0");
           setRemarks(d.remarks ?? "");
@@ -134,7 +157,7 @@ function NewOrder() {
     setChemist(existing.chemist_id);
     const next: Record<string, number> = {};
     for (const item of existing.order_items) next[item.product_id] = item.qty;
-    setQty(next);
+    setRows(rowsFromQty(next));
     setSoPct(String(existing.so_discount_pct ?? 0));
     setExtraPct(String(existing.extra_discount_pct ?? 0));
     setRemarks(existing.remarks ?? "");
@@ -160,14 +183,22 @@ function NewOrder() {
     return next;
   }, [stock, queuedQty, editing, ownQty]);
   const saleable = products.filter((p) => p.active && p.kind === "saleable");
-  const lines = saleable.filter((p) => (qty[p.id] ?? 0) > 0).map((p) => ({ product: p, qty: qty[p.id] ?? 0 }));
-  const chosenIds = useMemo(() => new Set(lines.map((l) => l.product.id)), [lines]);
+  const lines = saleable.flatMap((p) => ((qty[p.id] ?? 0) > 0 ? [{ product: p, qty: qty[p.id] ?? 0 }] : []));
   const so = Number(soPct) || 0;
   const extra = Number(extraPct) || 0;
   const totals = computeOrderTotals(lines.map((l) => ({ mrp: Number(l.product.mrp), base_trp: Number(l.product.base_trp), qty: l.qty })), so, extra);
   const policy = settings ?? { so_discount_max_pct: 5, extra_discount_max_pct: 20, extra_discount_so_limit_pct: 5 };
   const disc = checkDiscounts(so, extra, policy);
   const overStock = lines.filter((l) => l.qty > (availMap.get(l.product.id) ?? 0));
+  const saveBlock = !chemist
+    ? "Choose a chemist before saving."
+    : !bookingSo
+      ? "This chemist has no Sales Officer assigned."
+      : lines.length === 0
+        ? "Select a product and enter a quantity."
+        : overStock.length > 0
+          ? "A quantity is higher than the stock on hand."
+          : "";
 
   const queueOffline = (why: "offline" | "dropped") => {
     offline.queueOrder({
@@ -254,8 +285,6 @@ function NewOrder() {
     );
   }
 
-  const setLine = (id: string, v: number) => setQty((x) => ({ ...x, [id]: Math.max(0, Math.floor(v)) }));
-  const addProduct = (id: string) => setQty((x) => ({ ...x, [id]: (x[id] ?? 0) > 0 ? x[id] : 1 }));
   const title = editing ? "Edit Order" : "New Order";
   const subtitle = editing
     ? "Change the chemist shop, quantities, or discounts before delivery. Prices are recalculated when you save."
@@ -315,75 +344,86 @@ function NewOrder() {
                 <span className="grid size-7 place-items-center rounded-lg bg-primary-soft text-primary"><Package className="size-4" /></span>
                 <h2 className="text-sm font-semibold">Products</h2>
               </span>
-              <ProductPicker products={saleable} chosen={chosenIds} onPick={addProduct} />
+              <Button type="button" size="icon" variant="outline" className="size-9" aria-label="Add product" onClick={() => setRows((list) => [...list, blankRow()])}>
+                <Plus />
+              </Button>
             </header>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-sm">
+            <div>
+              <table className="w-full table-fixed text-sm">
+                <colgroup>
+                  <col />
+                  <col className="w-14" />
+                  <col className="w-16" />
+                  <col className="w-16" />
+                  <col className="w-[5.75rem]" />
+                  <col className="w-14" />
+                  <col className="w-9" />
+                </colgroup>
                 <thead>
-                  <tr className="bg-[#0d5c4a] text-left text-[11px] font-semibold uppercase tracking-wide text-white">
-                    <th className="px-4 py-2.5 font-semibold">Product</th>
-                    <th className="px-3 py-2.5 font-semibold">Stock</th>
-                    <th className="px-3 py-2.5 font-semibold">MRP</th>
-                    <th className="px-3 py-2.5 font-semibold">TRP</th>
-                    <th className="px-3 py-2.5 font-semibold">Pack size</th>
-                    <th className="px-4 py-2.5 text-right font-semibold">Quantity</th>
+                  <tr className="bg-[#0d5c4a] text-left text-[11px] font-semibold uppercase tracking-normal text-white">
+                    <th className="px-3 py-2.5 font-semibold">Product</th>
+                    <th className="px-1 py-2.5 text-center font-semibold">Stock</th>
+                    <th className="px-1 py-2.5 text-center font-semibold">MRP</th>
+                    <th className="px-1 py-2.5 text-center font-semibold">TRP</th>
+                    <th className="px-1 py-2.5 text-center font-semibold">Pack</th>
+                    <th className="px-1 py-2.5 text-center font-semibold">Qty</th>
+                    <th className="py-2.5" />
                   </tr>
                 </thead>
                 <tbody>
-                  {lines.map((line, index) => {
-                    const p = line.product;
-                    const v = line.qty;
-                    const a = availMap.get(p.id) ?? 0;
-                    const over = v > a;
+                  {rows.map((row) => {
+                    const product = saleable.find((item) => item.id === row.productId);
+                    const available = product ? (availMap.get(product.id) ?? 0) : 0;
+                    const amount = Math.max(0, Math.floor(Number(row.qty) || 0));
+                    const over = !!product && amount > available;
+                    const taken = new Set(rows.filter((other) => other.key !== row.key && other.productId).map((other) => other.productId));
+                    const choices = saleable.filter((item) => item.id === row.productId || !taken.has(item.id));
+                    const readOnlyField = "h-9 min-w-0 bg-muted/40 px-1.5 text-center";
                     return (
-                      <tr key={p.id} className="border-b border-border/70 bg-primary-soft/40">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <ProductMark name={p.name} index={index} />
-                            <div className="min-w-0">
-                              <div className="font-semibold">{p.name}</div>
-                              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{p.code}</div>
-                            </div>
-                          </div>
+                      <tr key={row.key} className="border-b border-border/70">
+                        <td className="min-w-0 px-2 py-2">
+                          <ProductSearch
+                            products={choices}
+                            value={row.productId}
+                            placeholder="Select product"
+                            aria-label="Product"
+                            className="w-full min-w-0 truncate"
+                            onChange={(id) => setRows((list) => list.map((item) => item.key === row.key ? { ...item, productId: id, qty: item.qty === "" ? "1" : item.qty } : item))}
+                          />
                         </td>
-                        <td className="px-3 py-3">
-                          <span className={`inline-flex min-w-8 justify-center rounded-full px-2 py-0.5 text-xs font-semibold ${a > 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-600"}`}>
-                            <Qty value={a} />
-                          </span>
+                        <td className="px-1 py-2"><Input readOnly tabIndex={-1} value={product ? String(available) : ""} placeholder="—" aria-label="Stock" title={product ? String(available) : undefined} className={readOnlyField} /></td>
+                        <td className="px-1 py-2"><Input readOnly tabIndex={-1} value={product ? String(product.mrp) : ""} placeholder="—" aria-label="MRP" className={readOnlyField} /></td>
+                        <td className="px-1 py-2"><Input readOnly tabIndex={-1} value={product ? String(product.base_trp) : ""} placeholder="—" aria-label="TRP" className={readOnlyField} /></td>
+                        <td className="px-1 py-2"><Input readOnly tabIndex={-1} value={product?.pack_size ?? ""} placeholder="—" aria-label="Pack size" title={product?.pack_size || undefined} className={`${readOnlyField} text-xs`} /></td>
+                        <td className="px-1 py-2">
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            disabled={!product}
+                            value={row.qty}
+                            placeholder="0"
+                            aria-label="Quantity"
+                            className={`num h-9 min-w-0 px-1 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${over ? "border-destructive" : ""}`}
+                            onChange={(e) => setRows((list) => list.map((item) => item.key === row.key ? { ...item, qty: e.target.value } : item))}
+                          />
+                          {over && <div className="mt-1 text-center text-[11px] font-semibold text-destructive">Max {available}</div>}
                         </td>
-                        <td className="num px-3 py-3"><Money value={p.mrp} /></td>
-                        <td className="num px-3 py-3 font-semibold text-emerald-700"><Money value={p.base_trp} /></td>
-                        <td className="px-3 py-3 text-muted-foreground">{p.pack_size || "—"}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex justify-end">
-                            <div className={`inline-flex items-center rounded-lg border bg-card ${over ? "border-destructive" : "border-input"}`}>
-                              <button type="button" className="grid size-8 place-items-center text-muted-foreground hover:text-foreground" onClick={() => setLine(p.id, v - 1)} aria-label={`Less ${p.name}`}>
-                                <Minus className="size-3.5" />
-                              </button>
-                              <input
-                                type="number"
-                                inputMode="numeric"
-                                min={0}
-                                aria-label={`${p.name} quantity`}
-                                className="num w-8 border-0 bg-transparent text-center text-sm outline-none"
-                                value={v}
-                                onChange={(e) => setLine(p.id, Number(e.target.value) || 0)}
-                              />
-                              <button type="button" className="grid size-8 place-items-center text-muted-foreground hover:text-foreground" onClick={() => setLine(p.id, v + 1)} aria-label={`More ${p.name}`}>
-                                <Plus className="size-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                          {over && <div className="mt-1 text-right text-[11px] font-semibold text-destructive">Available {a}</div>}
+                        <td className="py-2 pr-1 text-center">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="size-8"
+                            aria-label="Remove product"
+                            onClick={() => setRows((list) => (list.length === 1 ? [blankRow()] : list.filter((item) => item.key !== row.key)))}
+                          >
+                            <Trash2 />
+                          </Button>
                         </td>
                       </tr>
                     );
                   })}
-                  {lines.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">Search and select a product to add it here.</td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
@@ -431,14 +471,18 @@ function NewOrder() {
                 </div>
               </Field>
               <Button
-                className="h-11 w-full bg-[#0d5c4a] text-white hover:bg-[#0a4a3b] disabled:opacity-100"
+                type="button"
+                className="h-11 w-full bg-[#0d5c4a] text-white hover:bg-[#0a4a3b]"
                 size="lg"
-                disabled={!chemist || !bookingSo || lines.length === 0 || disc.errors.length > 0 || overStock.length > 0 || save.isPending}
+                disabled={!!saveBlock || disc.errors.length > 0 || save.isPending}
                 onClick={() => save.mutate()}
               >
                 {editing || s.isSuper || offline.online ? <Save /> : <CloudOff />}
                 {save.isPending ? "Saving…" : editing ? "Save changes" : s.isSuper || offline.online ? "Save Order" : "Save offline"}
               </Button>
+              {saveBlock && !save.isPending && (
+                <p className="text-center text-xs font-medium text-destructive">{saveBlock}</p>
+              )}
               <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
                 <Info className="size-3.5 shrink-0" />
                 {editing
@@ -611,125 +655,6 @@ function ChemistPicker({ chemists, value, onChange }: { chemists: Shop[]; value:
           )
         : null}
     </div>
-  );
-}
-
-type PickerProduct = { id: string; name: string; code: string; generic_name?: string | null; pack_size?: string | null };
-
-function ProductPicker({ products, chosen, onPick }: { products: PickerProduct[]; chosen: Set<string>; onPick: (id: string) => void }) {
-  const [q, setQ] = useState("");
-  const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
-  const menu = useRef<HTMLDivElement>(null);
-  const [box, setBox] = useState<{ top: number; left: number; width: number; maxH: number } | null>(null);
-  const matches = products.filter((p) => !q || `${p.name} ${p.code} ${p.generic_name ?? ""} ${p.pack_size ?? ""}`.toLowerCase().includes(q.toLowerCase()));
-
-  const place = () => {
-    const el = root.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const below = window.innerHeight - rect.bottom;
-    setBox({
-      top: rect.bottom + 6,
-      left: Math.min(rect.left, window.innerWidth - Math.max(rect.width, 260) - 8),
-      width: Math.max(rect.width, 260),
-      maxH: Math.max(140, Math.min(280, below - 16)),
-    });
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    place();
-    const onPointer = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (root.current?.contains(target) || menu.current?.contains(target)) return;
-      setOpen(false);
-    };
-    window.addEventListener("scroll", place, true);
-    window.addEventListener("resize", place);
-    document.addEventListener("pointerdown", onPointer);
-    return () => {
-      window.removeEventListener("scroll", place, true);
-      window.removeEventListener("resize", place);
-      document.removeEventListener("pointerdown", onPointer);
-    };
-  }, [open]);
-
-  const pick = (id: string) => {
-    onPick(id);
-    setQ("");
-    setOpen(false);
-  };
-
-  return (
-    <div ref={root} className="relative w-full sm:w-72">
-      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-      <Input
-        placeholder="Search products..."
-        value={q}
-        onChange={(e) => {
-          setQ(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") setOpen(false);
-          if (e.key === "Enter" && matches[0]) {
-            e.preventDefault();
-            pick(matches[0].id);
-          }
-        }}
-        className="h-9 pl-9"
-        aria-label="Search products"
-        role="combobox"
-        aria-expanded={open}
-      />
-      {open && box && typeof document !== "undefined"
-        ? createPortal(
-            <div
-              ref={menu}
-              role="listbox"
-              className="fixed z-[60] overflow-y-auto rounded-xl border border-border/80 bg-popover p-1.5 text-popover-foreground shadow-[0_18px_40px_-18px_color-mix(in_oklab,var(--primary)_45%,transparent),0_2px_8px_-2px_color-mix(in_oklab,var(--foreground)_12%,transparent)]"
-              style={{ top: box.top, left: box.left, width: box.width, maxHeight: box.maxH }}
-            >
-              {matches.length === 0 ? (
-                <p className="px-2.5 py-2 text-sm text-muted-foreground">No products match that search.</p>
-              ) : (
-                matches.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    role="option"
-                    aria-selected={chosen.has(p.id)}
-                    onClick={() => pick(p.id)}
-                    className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-primary-soft"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium">{p.name}</span>
-                      <span className="block truncate text-[11px] uppercase tracking-wide text-muted-foreground">
-                        {p.code}
-                        {p.pack_size ? ` · ${p.pack_size}` : ""}
-                      </span>
-                    </span>
-                    {chosen.has(p.id) ? <Check className="size-3.5 shrink-0 text-primary" /> : null}
-                  </button>
-                ))
-              )}
-            </div>,
-            document.body,
-          )
-        : null}
-    </div>
-  );
-}
-
-const MARKS = ["bg-emerald-100 text-emerald-700", "bg-violet-100 text-violet-700", "bg-orange-100 text-orange-700", "bg-amber-100 text-amber-700"];
-
-function ProductMark({ name, index }: { name: string; index: number }) {
-  return (
-    <span className={`grid size-10 shrink-0 place-items-center rounded-lg text-[10px] font-bold ${MARKS[index % MARKS.length]}`}>
-      {name.slice(0, 2).toUpperCase()}
-    </span>
   );
 }
 

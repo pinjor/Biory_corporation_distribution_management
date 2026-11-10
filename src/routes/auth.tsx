@@ -67,6 +67,7 @@ function AuthPage() {
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
   const [remember, setRemember] = useState(true);
@@ -102,6 +103,8 @@ function AuthPage() {
     setMode(next);
     setSent(null);
     setFormError(null);
+    setPassword("");
+    setConfirm("");
     setShowPassword(false);
   }
 
@@ -118,11 +121,16 @@ function AuthPage() {
       } else if (mode === "signup") {
         return;
       } else {
-        const { error } = await api.auth.resetPasswordForEmail(email.trim(), {
-          redirectTo: `${window.location.origin}/reset-password`,
-        });
+        if (password.length < 8) {
+          throw new Error("Password must be at least 8 characters");
+        }
+        if (password !== confirm) {
+          throw new Error("Passwords do not match");
+        }
+        const { error } = await api.auth.resetOwnPassword(email.trim(), password);
         if (error) throw error;
-        setSent("If that email has an account, a password reset link is on its way.");
+        toast.success("Password updated. Sign in with the new password.");
+        switchMode("signin");
       }
     } catch (err) {
       const message = errorMessage(err);
@@ -147,7 +155,7 @@ function AuthPage() {
     mode === "signup"
       ? "A Super Admin creates every account. Public sign-up is closed."
       : mode === "forgot"
-        ? "Enter your work email and we'll send you a secure reset link."
+        ? "Enter your Sales Officer email, then choose a new password."
         : "Sign in to your BIORY Corporation workspace.";
 
   return (
@@ -240,57 +248,71 @@ function AuthPage() {
                   />
                 </AuthField>
 
-                {mode !== "forgot" && (
-                  <AuthField
-                    label="Password"
-                    htmlFor="password"
-                    aside={
-                      mode === "signin" ? (
-                        <button
-                          type="button"
-                          onClick={() => switchMode("forgot")}
-                          className="text-xs font-medium text-primary hover:underline"
-                        >
-                          Forgot password?
-                        </button>
-                      ) : null
-                    }
-                  >
-                    <div className="relative">
-                      <IconInput
-                        id="password"
-                        icon={<Lock />}
-                        type={showPassword ? "text" : "password"}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        onKeyUp={trackCaps}
-                        onKeyDown={trackCaps}
-                        onBlur={() => setCapsLock(false)}
-                        placeholder="Enter your password"
-                        required
-                        minLength={8}
-                        className="pr-11"
-                        autoComplete="current-password"
-                      />
-                      <Button
+                <AuthField
+                  label={mode === "forgot" ? "New password" : "Password"}
+                  htmlFor="password"
+                  aside={
+                    mode === "signin" ? (
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setShowPassword((v) => !v)}
-                        aria-label={showPassword ? "Hide password" : "Show password"}
-                        aria-pressed={showPassword}
-                        className="absolute right-1.5 top-1/2 size-8 -translate-y-1/2 text-muted-foreground hover:bg-muted"
+                        onClick={() => switchMode("forgot")}
+                        className="text-xs font-medium text-primary hover:underline"
                       >
-                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                      </Button>
-                    </div>
-                    {capsLock && (
-                      <p className="mt-1.5 text-xs font-medium text-warning-foreground">
-                        <span className="rounded bg-warning-soft px-1.5 py-0.5">
-                          Caps Lock is on
-                        </span>
-                      </p>
-                    )}
+                        Forgot password?
+                      </button>
+                    ) : null
+                  }
+                >
+                  <div className="relative">
+                    <IconInput
+                      id="password"
+                      icon={<Lock />}
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      onKeyUp={trackCaps}
+                      onKeyDown={trackCaps}
+                      onBlur={() => setCapsLock(false)}
+                      placeholder={mode === "forgot" ? "At least 8 characters" : "Enter your password"}
+                      required
+                      minLength={8}
+                      className="pr-11"
+                      autoComplete={mode === "forgot" ? "new-password" : "current-password"}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowPassword((v) => !v)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      aria-pressed={showPassword}
+                      className="absolute right-1.5 top-1/2 size-8 -translate-y-1/2 text-muted-foreground hover:bg-muted"
+                    >
+                      {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </Button>
+                  </div>
+                  {capsLock && (
+                    <p className="mt-1.5 text-xs font-medium text-warning-foreground">
+                      <span className="rounded bg-warning-soft px-1.5 py-0.5">
+                        Caps Lock is on
+                      </span>
+                    </p>
+                  )}
+                </AuthField>
+
+                {mode === "forgot" && (
+                  <AuthField label="Confirm password" htmlFor="confirm">
+                    <IconInput
+                      id="confirm"
+                      icon={<Lock />}
+                      type={showPassword ? "text" : "password"}
+                      value={confirm}
+                      onChange={(e) => setConfirm(e.target.value)}
+                      placeholder="Type the new password again"
+                      required
+                      minLength={8}
+                      autoComplete="new-password"
+                    />
                   </AuthField>
                 )}
 
@@ -316,7 +338,7 @@ function AuthPage() {
                     </>
                   ) : (
                     <>
-                      {mode === "signin" ? "Sign in" : "Send reset link"}
+                      {mode === "signin" ? "Sign in" : "Reset password"}
                       <ArrowRight className="transition-transform group-hover:translate-x-0.5" />
                     </>
                   )}
