@@ -106,7 +106,7 @@ function DoctorsPage() {
                   <TableCell className="num text-xs">{d.mobile ?? "—"}</TableCell>
                   <TableCell><StatusBadge status={d.status} /></TableCell>
                   <TableCell className="whitespace-nowrap text-right">
-                    {s.isSO && d.assigned_so === s.userId && d.status === "active" && (
+                    {(s.isSO || s.isSuper) && d.status === "active" && (
                       <Button asChild variant="ghost" size="icon" aria-label="Log visit">
                         <Link to="/visits/new" search={{ doctor: d.id }}><Stethoscope /></Link>
                       </Button>

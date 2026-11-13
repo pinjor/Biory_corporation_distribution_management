@@ -23,15 +23,11 @@ begin
       raise exception 'Choose a chemist shop or a doctor';
     end if;
     if p_party_kind = 'chemist' then
-      select business_name into v_name from chemists
-       where id = p_party_id and status = 'active'
-         and (assigned_so = public.current_user_id() or created_by = public.current_user_id());
-      if v_name is null then raise exception 'That chemist shop is not assigned to you'; end if;
+      select business_name into v_name from chemists where id = p_party_id and status = 'active';
+      if v_name is null then raise exception 'Chemist shop not found or inactive'; end if;
     else
-      select name into v_name from doctors
-       where id = p_party_id and status = 'active'
-         and (assigned_so = public.current_user_id() or created_by = public.current_user_id());
-      if v_name is null then raise exception 'That doctor is not assigned to you'; end if;
+      select name into v_name from doctors where id = p_party_id and status = 'active';
+      if v_name is null then raise exception 'Doctor not found or inactive'; end if;
     end if;
   end if;
   if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
@@ -70,7 +66,7 @@ create function public.submit_requisition_for(
   p_party_id uuid default null
 ) returns uuid
 language plpgsql security definer set search_path = public as $$
-declare v_id uuid; v_no text; it jsonb; v_qty int; v_pid uuid; v_name text; v_assigned uuid;
+declare v_id uuid; v_no text; it jsonb; v_qty int; v_pid uuid; v_name text;
 begin
   if not public.has_any_role(public.current_user_id(), array['super_admin','admin','warehouse_admin']::public.app_role[]) then
     raise exception 'Only Super Admin, Admin or Warehouse Admin can raise a requisition for a Sales Officer';
@@ -78,17 +74,12 @@ begin
   if p_party_id is not null then
     if p_party_kind not in ('chemist','doctor') then raise exception 'Choose a chemist shop or a doctor'; end if;
     if p_party_kind = 'chemist' then
-      select business_name, assigned_so into v_name, v_assigned from chemists where id = p_party_id and status = 'active';
+      select business_name into v_name from chemists where id = p_party_id and status = 'active';
       if v_name is null then raise exception 'Chemist shop not found or inactive'; end if;
     else
-      select name, assigned_so into v_name, v_assigned from doctors where id = p_party_id and status = 'active';
+      select name into v_name from doctors where id = p_party_id and status = 'active';
       if v_name is null then raise exception 'Doctor not found or inactive'; end if;
     end if;
-    if v_assigned is null then raise exception 'Assign a Sales Officer to this party first'; end if;
-    if p_so is not null and p_so is distinct from v_assigned then
-      raise exception 'That party is assigned to a different Sales Officer';
-    end if;
-    p_so := v_assigned;
   end if;
   if p_so is null then raise exception 'Choose a Sales Officer'; end if;
   if not public.has_role(p_so, 'sales_officer') then raise exception 'The assigned user is not a Sales Officer'; end if;
@@ -167,15 +158,24 @@ begin
     v_dest := public.so_location(r.so_id);
   end if;
   if v_dest is null then raise exception 'There is nowhere to receive this stock'; end if;
-  if exists (select 1 from requisition_batches where requisition_id = p_id) then
-    v_transit := public.transit_location();
-    perform 1 from locations where id = v_transit for update;
-    perform 1 from locations where id = v_dest for update;
-    for b in select * from requisition_batches where requisition_id = p_id loop
-      insert into stock_movements(product_id, batch_id, from_location, to_location, movement_type, qty, reference_type, reference_id, reference_no, performed_by)
-      values (b.product_id, b.batch_id, v_transit, v_dest, 'REQUISITION_RECEIPT', b.qty, 'REQUISITION', p_id, r.req_no, public.current_user_id());
-    end loop;
+  if not exists (select 1 from requisition_batches where requisition_id = p_id) then
+    insert into requisition_batches(requisition_id, product_id, batch_id, qty)
+    select p_id, sm.product_id, sm.batch_id, sm.qty
+      from stock_movements sm
+     where sm.reference_type = 'REQUISITION'
+       and sm.reference_id = p_id
+       and sm.movement_type = 'REQUISITION_ISSUE';
   end if;
+  if not exists (select 1 from requisition_batches where requisition_id = p_id) then
+    raise exception 'This requisition has no issued batches to receive';
+  end if;
+  v_transit := public.transit_location();
+  perform 1 from locations where id = v_transit for update;
+  perform 1 from locations where id = v_dest for update;
+  for b in select * from requisition_batches where requisition_id = p_id loop
+    insert into stock_movements(product_id, batch_id, from_location, to_location, movement_type, qty, reference_type, reference_id, reference_no, performed_by)
+    values (b.product_id, b.batch_id, v_transit, v_dest, 'REQUISITION_RECEIPT', b.qty, 'REQUISITION', p_id, r.req_no, public.current_user_id());
+  end loop;
   update requisitions set status = 'RECEIVED', received_at = now() where id = p_id;
   perform public._notify_roles(array['warehouse_admin','super_admin']::public.app_role[],
     'Stock received for ' || r.req_no, 'Receipt is confirmed', '/requisitions/' || p_id);

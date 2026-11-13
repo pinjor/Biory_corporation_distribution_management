@@ -221,15 +221,6 @@ codes = sorted(row["code"] for row in (products.get("data") or []))
 print("products:", ",".join(codes))
 PY
 
-docker compose exec -T postgres psql -U biory_owner -d biory -v ON_ERROR_STOP=1 <<'SQL'
-update public.chemists
-   set assigned_so = (select id from public.users where email = 'so@biory.local')
- where assigned_so is null;
-update public.doctors
-   set assigned_so = (select id from public.users where email = 'so@biory.local')
- where assigned_so is null;
-SQL
-
 if [[ "$FRESH" == 1 ]]; then
   sed -i 's/^ALLOW_SIGNUP=.*/ALLOW_SIGNUP=false/' .env
   docker compose up -d backend

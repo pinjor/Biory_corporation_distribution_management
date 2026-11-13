@@ -139,9 +139,9 @@ function ChemistsPage() {
                   </TableCell>
                   <TableCell><StatusBadge status={c.status} /></TableCell>
                   <TableCell className="whitespace-nowrap text-right">
-                    {((s.isSO && c.assigned_so === s.userId) || (s.isSuper && c.assigned_so)) && c.status === "active" && (
+                    {(s.isSO || s.isSuper) && c.status === "active" && (
                       <Button asChild variant="ghost" size="icon" aria-label="New order">
-                        <Link to="/orders/new" search={{ chemist: c.id, so: c.assigned_so ?? undefined }}><ShoppingCart /></Link>
+                        <Link to="/orders/new" search={{ chemist: c.id }}><ShoppingCart /></Link>
                       </Button>
                     )}
                     {(s.isAdmin || c.assigned_so === s.userId) && (

@@ -51,7 +51,7 @@ function VisitsPage() {
     <div>
       <PageHeader
         title="Doctor visits"
-        description="Visits and the samples or gifts handed over — each one draws down the SO's promotional stock."
+        description="Each visit is stored under the Sales Officer or Super Admin who logged it."
         actions={
           <>
             {(s.isSO || s.isSuper) && (
@@ -68,8 +68,8 @@ function VisitsPage() {
         actions={
           <ListToolbar query={q} onQuery={setQ} placeholder="Visit / doctor…" from={from} to={to} onFrom={setFrom} onTo={setTo}>
             {s.isStaff && (
-              <NativeSelect leading={<Users />} value={so} onChange={(e) => setSo(e.target.value)} className="h-9 w-40 shrink-0" aria-label="Sales officer">
-                <option value="">All SOs</option>
+              <NativeSelect leading={<Users />} value={so} onChange={(e) => setSo(e.target.value)} className="h-9 w-40 shrink-0" aria-label="Logged by">
+                <option value="">Everyone</option>
                 {sos.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
               </NativeSelect>
             )}
@@ -89,7 +89,7 @@ function VisitsPage() {
                 <TableHead>Visit</TableHead>
                 <TableHead>Date & time</TableHead>
                 <TableHead>Doctor</TableHead>
-                {s.isStaff && <TableHead>SO</TableHead>}
+                {s.isStaff && <TableHead>Logged by</TableHead>}
                 <TableHead>Purpose</TableHead>
                 <TableHead>Promotional items</TableHead>
               </TableRow>

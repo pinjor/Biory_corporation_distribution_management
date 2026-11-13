@@ -43,15 +43,25 @@ begin
     v_dest := public.so_location(r.so_id);
   end if;
   if v_dest is null then raise exception 'There is nowhere to receive this stock'; end if;
-  if exists (select 1 from requisition_batches where requisition_id = p_id) then
-    v_transit := public.transit_location();
-    perform 1 from locations where id = v_transit for update;
-    perform 1 from locations where id = v_dest for update;
-    for b in select * from requisition_batches where requisition_id = p_id loop
-      insert into stock_movements(product_id, batch_id, from_location, to_location, movement_type, qty, reference_type, reference_id, reference_no, performed_by)
-      values (b.product_id, b.batch_id, v_transit, v_dest, 'REQUISITION_RECEIPT', b.qty, 'REQUISITION', p_id, r.req_no, public.current_user_id());
-    end loop;
+  -- Issue always saves the batches. Recover them from the ledger if an older issue did not.
+  if not exists (select 1 from requisition_batches where requisition_id = p_id) then
+    insert into requisition_batches(requisition_id, product_id, batch_id, qty)
+    select p_id, sm.product_id, sm.batch_id, sm.qty
+      from stock_movements sm
+     where sm.reference_type = 'REQUISITION'
+       and sm.reference_id = p_id
+       and sm.movement_type = 'REQUISITION_ISSUE';
   end if;
+  if not exists (select 1 from requisition_batches where requisition_id = p_id) then
+    raise exception 'This requisition has no issued batches to receive';
+  end if;
+  v_transit := public.transit_location();
+  perform 1 from locations where id = v_transit for update;
+  perform 1 from locations where id = v_dest for update;
+  for b in select * from requisition_batches where requisition_id = p_id loop
+    insert into stock_movements(product_id, batch_id, from_location, to_location, movement_type, qty, reference_type, reference_id, reference_no, performed_by)
+    values (b.product_id, b.batch_id, v_transit, v_dest, 'REQUISITION_RECEIPT', b.qty, 'REQUISITION', p_id, r.req_no, public.current_user_id());
+  end loop;
   update requisitions set status = 'RECEIVED', received_at = now() where id = p_id;
   perform public._notify_roles(array['warehouse_admin','super_admin']::public.app_role[],
     'Stock received for ' || r.req_no, 'Receipt is confirmed', '/requisitions/' || p_id);
@@ -80,6 +90,8 @@ begin
     for a in select * from public._allocate_fefo(v_central, ri.product_id, ri.approved_qty) loop
       insert into stock_movements(product_id, batch_id, from_location, to_location, movement_type, qty, reference_type, reference_id, reference_no, performed_by)
       values (ri.product_id, a.o_batch_id, v_central, v_transit, 'REQUISITION_ISSUE', a.o_qty, 'REQUISITION', p_id, r.req_no, public.current_user_id());
+      insert into requisition_batches(requisition_id, product_id, batch_id, qty)
+      values (p_id, ri.product_id, a.o_batch_id, a.o_qty);
     end loop;
     update requisition_items set issued_qty = approved_qty where id = ri.id;
   end loop;
@@ -89,6 +101,46 @@ end $$;
 
 grant execute on function public.issue_requisition(uuid) to biory_app;
 grant execute on function public.receive_requisition(uuid) to biory_app;
+
+-- Receipts that were confirmed before the batch lines were saved left the stock in transit.
+do $$
+declare r record; b record; v_transit uuid; v_dest uuid;
+begin
+  v_transit := public.transit_location();
+  for r in
+    select * from public.requisitions q
+     where q.status = 'RECEIVED'
+       and not exists (
+         select 1 from public.stock_movements sm
+          where sm.reference_type = 'REQUISITION' and sm.reference_id = q.id and sm.movement_type = 'REQUISITION_RECEIPT'
+       )
+       and exists (
+         select 1 from public.stock_movements sm
+          where sm.reference_type = 'REQUISITION' and sm.reference_id = q.id and sm.movement_type = 'REQUISITION_ISSUE'
+       )
+  loop
+    if r.party_kind in ('chemist','doctor') then
+      v_dest := public.party_location(r.party_kind, r.party_id);
+    else
+      v_dest := public.so_location(r.so_id);
+    end if;
+    continue when v_dest is null or v_transit is null;
+    for b in
+      select sm.product_id, sm.batch_id, sm.qty
+        from public.stock_movements sm
+       where sm.reference_type = 'REQUISITION' and sm.reference_id = r.id and sm.movement_type = 'REQUISITION_ISSUE'
+    loop
+      insert into public.stock_movements(product_id, batch_id, from_location, to_location, movement_type, qty, reference_type, reference_id, reference_no, performed_by)
+      values (b.product_id, b.batch_id, v_transit, v_dest, 'REQUISITION_RECEIPT', b.qty, 'REQUISITION', r.id, r.req_no, r.so_id);
+      insert into public.requisition_batches(requisition_id, product_id, batch_id, qty)
+      select r.id, b.product_id, b.batch_id, b.qty
+       where not exists (
+         select 1 from public.requisition_batches rb
+          where rb.requisition_id = r.id and rb.product_id = b.product_id and rb.batch_id = b.batch_id
+       );
+    end loop;
+  end loop;
+end $$;
 
 -- An unread "stock issued" notice should open the receive page.
 update public.notifications n

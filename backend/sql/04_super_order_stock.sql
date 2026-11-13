@@ -45,19 +45,20 @@ begin
     select id into v_id from orders where idempotency_key = p_idempotency_key;
     if v_id is not null then return v_id; end if;
   end if;
+  -- A chemist shop is not tied to one officer. Any Sales Officer can book any active shop
+  -- from their own stock. Super Admin books any shop from the central warehouse; the order
+  -- is recorded under the admin who saved it so delivery and collection still have an owner.
   if public.has_role(public.current_user_id(), 'sales_officer') and (p_so is null or p_so = public.current_user_id()) then
     v_so := public.current_user_id();
   elsif public.has_role(public.current_user_id(), 'super_admin') then
-    v_so := p_so;
+    v_so := public.current_user_id();
     v_central := true;
-    if v_so is null or not public.has_role(v_so, 'sales_officer') then raise exception 'That chemist shop has no Sales Officer'; end if;
   else
     raise exception 'Only Sales Officers can create orders';
   end if;
   select * into s from app_settings where id = 1;
   select * into c from chemists where id = p_chemist;
   if c.id is null or c.status <> 'active' then raise exception 'Chemist not found or inactive'; end if;
-  if c.assigned_so is distinct from v_so and c.created_by is distinct from v_so then raise exception 'This chemist is not assigned to that Sales Officer'; end if;
   p_so_discount_pct := coalesce(p_so_discount_pct, 0); p_extra_discount_pct := coalesce(p_extra_discount_pct, 0);
   if p_so_discount_pct < 0 or p_so_discount_pct > s.so_discount_max_pct then raise exception 'SO discount must be between 0 and % percent', s.so_discount_max_pct; end if;
   if p_extra_discount_pct < 0 or p_extra_discount_pct > s.extra_discount_max_pct then raise exception 'Extra discount must be between 0 and % percent', s.extra_discount_max_pct; end if;

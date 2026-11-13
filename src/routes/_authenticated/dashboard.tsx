@@ -23,6 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useSession } from "@/lib/session";
 import { formatBDT, formatBDTCompact, formatInt, rangeFor, todayBD, type RangeKey } from "@/lib/format";
 import { salesOfficersQuery } from "@/lib/queries";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — BIORY Corporation" }] }),
@@ -146,6 +147,17 @@ function AdminDashboard() {
             {s.isFinance && <Link to="/wallet" className="block"><StatCard className="h-full hover:border-primary/40" label="SO wallets" value={formatBDTCompact(data.wallet_balance)} hint="Cash held by SOs" icon={<Wallet />} tone="warning" /></Link>}
             {s.isAdmin && <Link to="/visits" className="block"><StatCard className="h-full hover:border-primary/40" label="Doctor visits" value={formatInt(data.visits_count)} hint={`${data.new_chemists} new chemists`} icon={<Stethoscope />} /></Link>}
           </div>
+
+          <Section title="Sales, delivery and collection" description={`${r.from} to ${r.to}`}>
+            <MoneyBars
+              rows={[
+                { name: "Orders", value: Number(data.order_value) || 0 },
+                { name: "Delivered", value: Number(data.delivered_value) || 0 },
+                { name: "Collected", value: Number(data.collected_value) || 0 },
+                { name: "Due", value: Number(data.outstanding_due) || 0 },
+              ]}
+            />
+          </Section>
 
           <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
             {(s.isAdmin || s.isFinance) && (
@@ -287,20 +299,31 @@ function SODashboard() {
 
       <div>
         <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Quick actions</h2>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {tiles.map((t) => (
-            <Button key={t.to + t.label} asChild variant="tile">
-              <Link to={t.to}>
-                <span className="text-primary">{t.icon}</span>
-                <span>
-                  <span className="block font-semibold">{t.label}</span>
-                  <span className="block text-xs font-normal text-muted-foreground">{t.hint}</span>
-                </span>
-              </Link>
-            </Button>
+            <Link
+              key={t.to + t.label}
+              to={t.to}
+              className="flex min-h-28 flex-col items-start gap-2 rounded-xl border bg-card p-4 text-left shadow-sm hover:border-primary/40"
+            >
+              <span className="grid size-9 place-items-center rounded-lg bg-primary-soft text-primary [&_svg]:size-5">{t.icon}</span>
+              <span className="text-sm font-semibold text-foreground">{t.label}</span>
+              <span className="text-xs text-muted-foreground">{t.hint}</span>
+            </Link>
           ))}
         </div>
       </div>
+
+      <Section title="This month" description="Orders, what was delivered, what was collected, and what is still due.">
+        <MoneyBars
+          rows={[
+            { name: "Orders", value: Number(m?.order_value) || 0 },
+            { name: "Delivered", value: Number(m?.delivered_value) || 0 },
+            { name: "Collected", value: Number(m?.collected_value) || 0 },
+            { name: "Due", value: Number(m?.outstanding_due) || 0 },
+          ]}
+        />
+      </Section>
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Link to="/orders" className="block"><StatCard className="h-full hover:border-primary/40" label="This month · orders" value={formatBDTCompact(m?.order_value)} hint={`${m?.orders_count ?? 0} orders`} /></Link>
@@ -325,6 +348,26 @@ function SODashboard() {
           </ul>
         </Section>
       )}
+    </div>
+  );
+}
+
+function MoneyBars({ rows }: { rows: { name: string; value: number }[] }) {
+  const empty = rows.every((row) => row.value === 0);
+  return (
+    <div>
+      <div className="h-64 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="name" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 11 }} tickFormatter={(value) => formatBDTCompact(value)} width={64} axisLine={false} tickLine={false} />
+            <Tooltip formatter={(value) => formatBDT(Array.isArray(value) ? value[0] : value)} cursor={{ fill: "var(--muted)" }} />
+            <Bar dataKey="value" name="Amount" radius={[6, 6, 0, 0]} fill="var(--chart-1)" maxBarSize={48} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      {empty && <p className="mt-2 text-center text-xs text-muted-foreground">No amounts in this period yet. New orders, deliveries and collections will show here.</p>}
     </div>
   );
 }

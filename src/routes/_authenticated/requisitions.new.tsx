@@ -253,7 +253,7 @@ function NewRequisition() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title={edit ? "Edit requisition" : "Requisition entry"}
-        description="Super Admin, Admin, and warehouse can raise this for any Sales Officer. Added lines stay on this page until you save."
+        description="A Sales Officer asks the central warehouse for stock. Super Admin can raise the same request for any Sales Officer."
       />
 
       <Section title="Requisition Details">
@@ -261,7 +261,7 @@ function NewRequisition() {
           <Labeled label="Date *">
             <Input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="min-w-0" />
           </Labeled>
-          <Labeled label="Req from *">
+          <Labeled label="From *">
             <NativeSelect
               value={requestStore}
               disabled={requestingLocked}
@@ -280,7 +280,7 @@ function NewRequisition() {
               })}
             </NativeSelect>
           </Labeled>
-          <Labeled label="Req to *">
+          <Labeled label="To *">
             <NativeSelect value={fulfillStore} onChange={(e) => setFulfillStore(e.target.value)}>
               <option value="">Select location</option>
               {centrals.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
@@ -291,7 +291,7 @@ function NewRequisition() {
           </Labeled>
         </div>
         {requestStore && !soId && (
-          <p className="mt-3 text-xs text-destructive">That store has no Sales Officer, so a requisition cannot be raised for it.</p>
+          <p className="mt-3 text-xs text-destructive">Choose the Sales Officer this stock request is for.</p>
         )}
       </Section>
 

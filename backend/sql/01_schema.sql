@@ -454,7 +454,7 @@ begin
   if public.current_user_id() is not null and not public.is_admin(public.current_user_id()) then
     new.assigned_so := public.current_user_id();
   end if;
-  if new.assigned_so is null then new.assigned_so := public.current_user_id(); end if;
+  -- A shop or doctor is not reserved for the admin who added them.
   return new;
 end $$;
 create trigger trg_chemist_code before insert on public.chemists for each row execute function public.set_party_code();

@@ -81,12 +81,10 @@ function NewOrder() {
   const offline = useOffline();
 
   const { data: allChemists = [], isPending: chemistsPending, isError: chemistsError } = useQuery({
-    queryKey: ["chemists", "order-form", s.isSuper ? "all" : s.userId],
+    queryKey: ["chemists", "order-form", s.userId],
     enabled: canBook,
     queryFn: async () => {
-      let q = api.from("chemists").select("*").eq("status", "active").order("business_name");
-      if (!s.isSuper) q = q.eq("assigned_so", s.userId);
-      const { data, error } = await q;
+      const { data, error } = await api.from("chemists").select("*").eq("status", "active").order("business_name");
       if (error) throw error;
       return data ?? [];
     },
@@ -94,7 +92,7 @@ function NewOrder() {
   const [chemist, setChemist] = useState(search.chemist ?? "");
   const chemists = allChemists;
   const selectedChemist = allChemists.find((c) => c.id === chemist);
-  const bookingSo = editing ? (existing?.so_id ?? "") : s.isSuper ? (selectedChemist?.assigned_so ?? "") : s.userId;
+  const bookingSo = editing ? (existing?.so_id ?? "") : s.userId;
   const fromCentral = editing ? existing?.stock_from === "central" : s.isSuper;
   const { data: stock = [] } = useQuery({
     ...myAvailableStockQuery,
@@ -192,9 +190,7 @@ function NewOrder() {
   const overStock = lines.filter((l) => l.qty > (availMap.get(l.product.id) ?? 0));
   const saveBlock = !chemist
     ? "Choose a chemist before saving."
-    : !bookingSo
-      ? "This chemist has no Sales Officer assigned."
-      : lines.length === 0
+    : lines.length === 0
         ? "Select a product and enter a quantity."
         : overStock.length > 0
           ? "A quantity is higher than the stock on hand."
@@ -245,7 +241,6 @@ function NewOrder() {
         p_extra_discount_pct: extra,
         p_remarks: opt(remarks),
         p_idempotency_key: idemKey,
-        ...(s.isSuper ? { p_so: bookingSo } : {}),
       });
       if (error) {
         // No definitive answer from the server: keep it on the device (same idempotency key, so no duplicate).

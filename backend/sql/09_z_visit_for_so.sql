@@ -19,7 +19,6 @@ begin
   if not public.has_role(v_so, 'sales_officer') and not v_self then raise exception 'Only Sales Officers can record visits'; end if;
   select * into d from doctors where id = p_doctor;
   if d.id is null or d.status <> 'active' then raise exception 'Doctor not found or inactive'; end if;
-  if not v_self and d.assigned_so is distinct from v_so and d.created_by is distinct from v_so then raise exception 'This doctor is not assigned to that Sales Officer'; end if;
   if p_start is not null and p_end is not null and p_end < p_start then raise exception 'End time must be after start time'; end if;
   if p_date is not null and p_date > public.today_bd() then raise exception 'Visit date cannot be in the future'; end if;
   v_loc := public.so_location(v_so);

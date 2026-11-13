@@ -49,9 +49,6 @@ begin
   select * into s from app_settings where id = 1;
   select * into c from chemists where id = p_chemist;
   if c.id is null or c.status <> 'active' then raise exception 'Chemist not found or inactive'; end if;
-  if c.assigned_so is distinct from o.so_id and c.created_by is distinct from o.so_id then
-    raise exception 'This chemist is not assigned to that Sales Officer';
-  end if;
 
   p_so_discount_pct := coalesce(p_so_discount_pct, 0);
   p_extra_discount_pct := coalesce(p_extra_discount_pct, 0);

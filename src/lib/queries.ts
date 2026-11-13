@@ -113,7 +113,7 @@ export const myAvailableStockQuery = queryOptions({
   gcTime: OFFLINE_GC,
 });
 
-/** Active chemists assigned to this Sales Officer (used by the order form, also offline). */
+/** Every active chemist. Any officer can sell to any shop, including offline. */
 export const myChemistsQuery = (userId: string) =>
   queryOptions({
     queryKey: ["chemists", "mine", userId],
@@ -121,7 +121,6 @@ export const myChemistsQuery = (userId: string) =>
       const { data, error } = await api
         .from("chemists")
         .select("*")
-        .eq("assigned_so", userId)
         .eq("status", "active")
         .order("business_name");
       if (error) throw error;

@@ -188,6 +188,7 @@ begin
 end $$;
 
 drop function if exists public.submit_requisition_for(uuid, jsonb, text, boolean);
+drop function if exists public.submit_requisition_for(uuid, jsonb, text, boolean, text, uuid);
 
 create or replace function public.submit_requisition_for(
   p_so uuid, p_items jsonb, p_remarks text, p_approve boolean, p_party_kind text, p_party_id uuid
